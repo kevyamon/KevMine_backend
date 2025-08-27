@@ -54,6 +54,12 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/robots', robotRoutes);
 app.use('/api/logs', logRoutes);
 
+// Ping endpoint to keep the server awake
+app.get('/ping', (req, res) => {
+  res.status(200).send('Pong');
+});
+
+
 // Deployment logic
 const __dirname = path.resolve();
 
