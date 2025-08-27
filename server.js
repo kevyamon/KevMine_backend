@@ -4,7 +4,7 @@ import connectDB from './config/db.js';
 import userRoutes from './routes/userRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import robotRoutes from './routes/robotRoutes.js';
-import logRoutes from './routes/logRoutes.js'; // Added logRoutes
+import logRoutes from './routes/logRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import cors from 'cors';
 import http from 'http';
@@ -47,7 +47,7 @@ socketHandler(io);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/robots', robotRoutes);
-app.use('/api/logs', logRoutes); // Added logRoutes
+app.use('/api/logs', logRoutes);
 
 // Deployment logic
 const __dirname = path.resolve();
