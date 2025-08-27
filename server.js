@@ -19,8 +19,12 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Use CORS for all requests
-app.use(cors());
+// Configure CORS for production
+const corsOptions = {
+  origin: process.env.FRONTEND_URL,
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
 // Body parser middleware
 app.use(express.json());
@@ -29,8 +33,9 @@ app.use(express.urlencoded({ extended: true }));
 // Socket.io configuration
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: process.env.FRONTEND_URL,
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
