@@ -196,7 +196,8 @@ const logoutUser = asyncHandler(async (req, res) => {
 // @route   GET /api/users/profile
 // @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
+  // On utilise .populate() pour charger les détails complets des robots dans l'inventaire
+  const user = await User.findById(req.user._id).populate('inventory');
 
   if (user) {
     res.status(200).json({
@@ -207,6 +208,10 @@ const getUserProfile = asyncHandler(async (req, res) => {
       isSuperAdmin: user.isSuperAdmin,
       photo: user.photo,
       status: user.status,
+      // AJOUT DES DONNÉES DE JEU
+      keviumBalance: user.keviumBalance,
+      inventory: user.inventory,
+      purchaseHistory: user.purchaseHistory,
     });
   } else {
     res.status(404);
@@ -239,6 +244,10 @@ const updateUserProfile = asyncHandler(async (req, res) => {
       isAdmin: updatedUser.isAdmin,
       isSuperAdmin: updatedUser.isSuperAdmin,
       status: updatedUser.status,
+      // On s'assure de renvoyer aussi les données de jeu lors d'une mise à jour
+      keviumBalance: updatedUser.keviumBalance,
+      inventory: updatedUser.inventory,
+      purchaseHistory: updatedUser.purchaseHistory,
     });
   } else {
     res.status(404);
