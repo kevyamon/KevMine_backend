@@ -6,7 +6,7 @@ const userSchema = mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true, // Assurons-nous que le pseudo est unique
+      unique: true,
     },
     email: {
       type: String,
@@ -15,9 +15,9 @@ const userSchema = mongoose.Schema(
     },
     phone: {
       type: String,
-      required: false, // On ne le rend pas obligatoire pour l'instant
+      required: false,
       unique: true,
-      sparse: true, // Important pour permettre plusieurs documents avec une valeur nulle
+      sparse: true,
     },
     password: {
       type: String,
@@ -42,11 +42,19 @@ const userSchema = mongoose.Schema(
       enum: ['active', 'banned', 'inactive'],
       default: 'active',
     },
-    // ---- AJOUTS POUR LE GAMEPLAY ----
+    // ---- GAMEPLAY FIELDS ----
     keviumBalance: {
       type: Number,
       required: true,
-      default: 500, // On offre 500 KVM de départ aux nouveaux joueurs
+      default: 500,
+    },
+    unclaimedKevium: { // KVM minés mais non réclamés
+      type: Number,
+      default: 0,
+    },
+    lastKvmUpdate: { // Date du dernier calcul de minage
+      type: Date,
+      default: Date.now,
     },
     inventory: [
       {
@@ -62,7 +70,7 @@ const userSchema = mongoose.Schema(
         purchaseDate: { type: Date, default: Date.now },
       },
     ],
-    // ---- FIN DES AJOUTS ----
+    // ---- END GAMEPLAY FIELDS ----
     resetPasswordToken: String,
     resetPasswordExpire: Date,
     loginAttempts: {
@@ -88,8 +96,8 @@ userSchema.methods.incLoginAttempts = async function () {
   }
   this.loginAttempts += 1;
   if (this.loginAttempts >= 5) {
-    this.lockUntil = Date.now() + 10 * 60 * 1000; // Lock for 10 minutes
-    this.loginAttempts = 0; // Reset attempts for next cycle
+    this.lockUntil = Date.now() + 10 * 60 * 1000;
+    this.loginAttempts = 0;
   }
   await this.save();
 };
@@ -100,12 +108,10 @@ userSchema.methods.resetLoginAttempts = async function () {
   await this.save();
 };
 
-// Match user entered password to hashed password in database
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Encrypt password using bcrypt before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
     next();
