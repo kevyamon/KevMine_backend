@@ -16,7 +16,6 @@ const getUserGameStatus = asyncHandler(async (req, res) => {
   const lastUpdate = new Date(user.lastKvmUpdate);
   const diffInSeconds = (now - lastUpdate) / 1000;
 
-  // Si moins de 10 secondes se sont écoulées, on ne fait rien pour éviter les abus
   if (diffInSeconds < 10) {
     return res.json({
       keviumBalance: user.keviumBalance,
@@ -29,7 +28,6 @@ const getUserGameStatus = asyncHandler(async (req, res) => {
     0
   );
 
-  // Calculer les gains par seconde (1h = 3600s)
   const kvmPerSecond = totalMiningPower / 3600;
   const newlyMinedKevium = diffInSeconds * kvmPerSecond;
   
@@ -48,7 +46,6 @@ const getUserGameStatus = asyncHandler(async (req, res) => {
 // @route   POST /api/game/claim
 // @access  Private
 const claimKevium = asyncHandler(async (req, res) => {
-  // On recalcule une dernière fois avant de réclamer
   const user = await User.findById(req.user._id).populate('inventory');
   
   if (!user) {
@@ -89,4 +86,17 @@ const claimKevium = asyncHandler(async (req, res) => {
   });
 });
 
-export { getUserGameStatus, claimKevium };
+// @desc    Get the top players leaderboard
+// @route   GET /api/game/leaderboard
+// @access  Public
+const getLeaderboard = asyncHandler(async (req, res) => {
+  const leaderboard = await User.find({ isAdmin: false })
+    .sort({ keviumBalance: -1 }) // Trier par solde de Kevium, du plus grand au plus petit
+    .limit(100) // Limiter aux 100 meilleurs joueurs
+    .select('name keviumBalance'); // Ne sélectionner que les champs nécessaires
+
+  res.json(leaderboard);
+});
+
+
+export { getUserGameStatus, claimKevium, getLeaderboard }; // Exporter la nouvelle fonction

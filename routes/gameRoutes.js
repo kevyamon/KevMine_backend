@@ -1,13 +1,21 @@
 import express from 'express';
 import { protect } from '../middleware/authMiddleware.js';
-import { getUserGameStatus, claimKevium } from '../controllers/gameController.js';
+import {
+  getUserGameStatus,
+  claimKevium,
+  getLeaderboard, // 1. Importer la nouvelle fonction
+} from '../controllers/gameController.js';
 
 const router = express.Router();
 
-// Toutes les routes de jeu nécessitent que l'utilisateur soit connecté
-router.use(protect);
+// ---- NOUVELLE ROUTE PUBLIQUE ----
+// Tout le monde peut voir le classement, même sans être connecté
+router.get('/leaderboard', getLeaderboard);
 
-router.get('/status', getUserGameStatus);
-router.post('/claim', claimKevium);
+// ---- ROUTES PRIVÉES ----
+// Il faut être connecté pour accéder à son statut de jeu et réclamer des gains
+router.post('/claim', protect, claimKevium);
+router.get('/status', protect, getUserGameStatus);
+
 
 export default router;
