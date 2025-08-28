@@ -13,7 +13,6 @@ import jwt from 'jsonwebtoken';
 const authUser = asyncHandler(async (req, res) => {
   const { identifier, password } = req.body;
 
-  // Chercher l'utilisateur par email, nom ou téléphone
   const user = await User.findOne({
     $or: [{ email: identifier }, { name: identifier }, { phone: identifier }],
   });
@@ -22,7 +21,7 @@ const authUser = asyncHandler(async (req, res) => {
     await Log.create({
       action: 'login_fail',
       description: `Tentative de connexion échouée pour l'identifiant: ${identifier}`,
-      email: identifier, // On log l'identifiant utilisé
+      email: identifier,
       ip: req.ip,
     });
     res.status(401);
@@ -115,7 +114,7 @@ const registerUser = asyncHandler(async (req, res) => {
     name,
     email,
     password,
-    phone, // On ajoute le téléphone ici
+    phone,
     isAdmin: isSuperAdmin,
     isSuperAdmin: isSuperAdmin,
   };
@@ -204,7 +203,14 @@ const logoutUser = asyncHandler(async (req, res) => {
 // @route   GET /api/users/profile
 // @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).populate('inventory');
+  // CORRECTION : On peuple l'inventaire ET la catégorie de chaque robot
+  const user = await User.findById(req.user._id).populate({
+    path: 'inventory',
+    populate: {
+      path: 'category',
+      model: 'Category'
+    }
+  });
 
   if (user) {
     res.status(200).json(user);
@@ -224,7 +230,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
     user.photo = req.body.photo || user.photo;
-    user.phone = req.body.phone || user.phone; // Permettre la mise à jour du numéro
+    user.phone = req.body.phone || user.phone;
 
     if (req.body.password) {
       user.password = req.body.password;
