@@ -104,7 +104,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   // ---- LOGIQUE SUPERADMIN ----
-  const isSuperAdmin = email === process.env.SUPER_ADMIN_MAIL;
+  const isSuperAdmin = email === process.env.SUPER_ADMIN_EMAIL;
 
   const user = await User.create({
     name,
@@ -202,7 +202,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
   if (user) {
     const userData = user.toObject();
     // ---- LOGIQUE SUPERADMIN ----
-    if (userData.email === process.env.SUPER_ADMIN_MAIL) {
+    if (userData.email === process.env.SUPER_ADMIN_EMAIL) {
         userData.keviumBalance = 999999999;
     }
     
@@ -232,7 +232,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     const userData = updatedUser.toObject();
 
     // ---- LOGIQUE SUPERADMIN ----
-    if (userData.email === process.env.SUPER_ADMIN_MAIL) {
+    if (userData.email === process.env.SUPER_ADMIN_EMAIL) {
         userData.keviumBalance = 999999999;
     }
     delete userData.password;
