@@ -52,16 +52,14 @@ const authUser = asyncHandler(async (req, res) => {
     await generateTokens(res, user._id);
     await user.resetLoginAttempts();
 
-    res.status(200).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      isAdmin: user.isAdmin,
-      isSuperAdmin: user.isSuperAdmin,
-      photo: user.photo,
-      status: user.status,
-      isNewUser,
-    });
+    // ---- LOGIQUE SUPERADMIN ----
+    const userData = user.toObject();
+    if (userData.email === process.env.SUPER_ADMIN_EMAIL) {
+        userData.keviumBalance = 99999999999999999999999; // Solde illimité
+    }
+    delete userData.password; // Ne jamais renvoyer le mot de passe
+
+    res.status(200).json({ ...userData, isNewUser });
     
     req.io.to(req.io.getAdminSockets()).emit('user_login', {
       userId: user._id,
@@ -105,25 +103,28 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error('Un utilisateur avec cet email existe déjà');
   }
 
+  // ---- LOGIQUE SUPERADMIN ----
+  const isSuperAdmin = email === process.env.SUPER_ADMIN_MAIL;
+
   const user = await User.create({
     name,
     email,
     password,
+    isAdmin: isSuperAdmin, // Le SuperAdmin est aussi un Admin
+    isSuperAdmin: isSuperAdmin,
   });
 
   if (user) {
     const isNewUser = true;
     await generateTokens(res, user._id);
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      isAdmin: user.isAdmin,
-      isSuperAdmin: user.isSuperAdmin,
-      photo: user.photo,
-      status: user.status,
-      isNewUser,
-    });
+
+    const userData = user.toObject();
+    if (isSuperAdmin) {
+        userData.keviumBalance = 999999999;
+    }
+    delete userData.password;
+
+    res.status(201).json({ ...userData, isNewUser });
   } else {
     res.status(400);
     throw new Error('Données utilisateur invalides');
@@ -165,7 +166,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     res.cookie('jwt', newAccessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'strict',
+      sameSite: 'none',
       maxAge: 15 * 60 * 1000,
     });
 
@@ -196,23 +197,16 @@ const logoutUser = asyncHandler(async (req, res) => {
 // @route   GET /api/users/profile
 // @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
-  // On utilise .populate() pour charger les détails complets des robots dans l'inventaire
   const user = await User.findById(req.user._id).populate('inventory');
 
   if (user) {
-    res.status(200).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      isAdmin: user.isAdmin,
-      isSuperAdmin: user.isSuperAdmin,
-      photo: user.photo,
-      status: user.status,
-      // AJOUT DES DONNÉES DE JEU
-      keviumBalance: user.keviumBalance,
-      inventory: user.inventory,
-      purchaseHistory: user.purchaseHistory,
-    });
+    const userData = user.toObject();
+    // ---- LOGIQUE SUPERADMIN ----
+    if (userData.email === process.env.SUPER_ADMIN_MAIL) {
+        userData.keviumBalance = 999999999;
+    }
+    
+    res.status(200).json(userData);
   } else {
     res.status(404);
     throw new Error('Utilisateur non trouvé');
@@ -235,20 +229,15 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     }
 
     const updatedUser = await user.save();
+    const userData = updatedUser.toObject();
 
-    res.status(200).json({
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      photo: updatedUser.photo,
-      isAdmin: updatedUser.isAdmin,
-      isSuperAdmin: updatedUser.isSuperAdmin,
-      status: updatedUser.status,
-      // On s'assure de renvoyer aussi les données de jeu lors d'une mise à jour
-      keviumBalance: updatedUser.keviumBalance,
-      inventory: updatedUser.inventory,
-      purchaseHistory: updatedUser.purchaseHistory,
-    });
+    // ---- LOGIQUE SUPERADMIN ----
+    if (userData.email === process.env.SUPER_ADMIN_MAIL) {
+        userData.keviumBalance = 999999999;
+    }
+    delete userData.password;
+
+    res.status(200).json(userData);
   } else {
     res.status(404);
     throw new Error('Utilisateur non trouvé');
