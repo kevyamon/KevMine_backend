@@ -22,7 +22,7 @@ const generateTokens = async (res, userId) => {
   res.cookie('jwt', accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV !== 'development',
-    // LA CORRECTION EST ICI
+    // Cette ligne est la plus importante. Elle doit être 'none' en production.
     sameSite: process.env.NODE_ENV === 'development' ? 'strict' : 'none',
     maxAge: 15 * 60 * 1000, // 15 minutes
   });
@@ -30,7 +30,7 @@ const generateTokens = async (res, userId) => {
   res.cookie('refresh', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV !== 'development',
-    // ET ICI
+    // Cette ligne est la plus importante. Elle doit être 'none' en production.
     sameSite: process.env.NODE_ENV === 'development' ? 'strict' : 'none',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
