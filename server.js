@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser'; // ÉTAPE 1: IMPORTER LE PACKAGE
 import connectDB from './config/db.js';
 import userRoutes from './routes/userRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
@@ -30,6 +31,9 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Cookie parser middleware
+app.use(cookieParser()); // ÉTAPE 2: UTILISER LE MIDDLEWARE
+
 // Socket.io configuration
 const io = new Server(server, {
   cors: {
@@ -58,7 +62,6 @@ app.use('/api/logs', logRoutes);
 app.get('/ping', (req, res) => {
   res.status(200).send('Pong');
 });
-
 
 // Deployment logic
 const __dirname = path.resolve();
