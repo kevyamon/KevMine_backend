@@ -1,6 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import Robot from '../models/robotModel.js';
 import User from '../models/userModel.js';
+import GameSetting from '../models/gameSettingModel.js'; // Importer les paramètres du jeu
 import sendEmail from '../utils/emailService.js';
 import { getPurchaseConfirmationTemplate } from '../utils/emailTemplates.js';
 
@@ -8,7 +9,6 @@ import { getPurchaseConfirmationTemplate } from '../utils/emailTemplates.js';
 // @route   GET /api/robots
 // @access  Public
 const getRobots = asyncHandler(async (req, res) => {
-  // CORRECTION : On ajoute .populate() pour inclure les infos de la catégorie
   const robots = await Robot.find({ owner: null }).populate('category');
   res.json(robots);
 });
@@ -17,7 +17,6 @@ const getRobots = asyncHandler(async (req, res) => {
 // @route   GET /api/robots/:id
 // @access  Public
 const getRobotById = asyncHandler(async (req, res) => {
-  // CORRECTION : On ajoute .populate() ici aussi
   const robot = await Robot.findById(req.params.id).populate('category');
   if (robot) {
     res.json(robot);
@@ -31,64 +30,130 @@ const getRobotById = asyncHandler(async (req, res) => {
 // @route   POST /api/robots/:id/purchase
 // @access  Private
 const purchaseRobot = asyncHandler(async (req, res) => {
-  const robot = await Robot.findById(req.params.id);
+  const robotToPurchase = await Robot.findById(req.params.id);
   const user = await User.findById(req.user._id);
 
-  if (!robot) {
+  if (!robotToPurchase) {
     res.status(404);
     throw new Error('Robot non trouvé.');
   }
 
-  if (robot.stock <= 0) {
-    res.status(400);
-    throw new Error('Ce robot est en rupture de stock.');
-  }
+  // Utiliser le prix de vente si c'est une revente, sinon le prix normal
+  const price = robotToPurchase.isPlayerSale ? robotToPurchase.salePrice : robotToPurchase.price;
 
-  if (!user.isSuperAdmin && user.keviumBalance < robot.price) {
+  if (user.keviumBalance < price) {
     res.status(400);
     throw new Error('Solde de Kevium insuffisant pour cet achat.');
   }
 
-  if (!user.isSuperAdmin) {
-    user.keviumBalance -= robot.price;
+  // --- Début de la transaction ---
+  user.keviumBalance -= price;
+
+  let purchasedRobot;
+
+  if (robotToPurchase.isPlayerSale) {
+    // C'est un robot d'occasion, on le transfère directement
+    if (robotToPurchase.stock <= 0) {
+      res.status(400);
+      throw new Error('Ce robot n\'est plus disponible.');
+    }
+    robotToPurchase.owner = user._id;
+    robotToPurchase.isPlayerSale = false;
+    robotToPurchase.stock = 0; // Il n'est plus dans le magasin
+    purchasedRobot = await robotToPurchase.save();
+  } else {
+    // C'est un robot neuf, on en crée une copie
+    if (robotToPurchase.stock <= 0) {
+      res.status(400);
+      throw new Error('Ce robot est en rupture de stock.');
+    }
+    robotToPurchase.stock -= 1;
+    await robotToPurchase.save();
+
+    purchasedRobot = new Robot({
+      ...robotToPurchase.toObject(),
+      _id: undefined,
+      owner: user._id,
+      stock: 0,
+      isPlayerSale: false,
+    });
+    await purchasedRobot.save();
   }
-  robot.stock -= 1;
 
-  const userRobot = new Robot({
-    ...robot.toObject(),
-    _id: undefined,
-    owner: user._id,
-    stock: 0,
-    name: robot.name,
-  });
-
-  await userRobot.save();
-
-  user.inventory.push(userRobot._id);
+  user.inventory.push(purchasedRobot._id);
   user.purchaseHistory.push({
-    robotId: userRobot._id,
-    robotName: robot.name,
-    price: user.isSuperAdmin ? 0 : robot.price,
+    robotId: purchasedRobot._id,
+    robotName: purchasedRobot.name,
+    price: price,
     purchaseDate: new Date(),
   });
 
-  await robot.save();
   const updatedUser = await user.save();
 
   const emailContent = getPurchaseConfirmationTemplate(
     user.name,
-    robot.name,
-    robot.icon,
-    user.isSuperAdmin ? 0 : robot.price,
+    purchasedRobot.name,
+    purchasedRobot.icon,
+    price,
     updatedUser.keviumBalance
   );
   await sendEmail({
     email: user.email,
-    subject: `Confirmation d'achat - ${robot.name}`,
+    subject: `Confirmation d'achat - ${purchasedRobot.name}`,
     htmlContent: emailContent,
   });
 
   res.status(200).json({ message: 'Achat réussi !', user: updatedUser });
+});
+
+// @desc    Sell a robot owned by the user
+// @route   POST /api/robots/:id/sell
+// @access  Private
+const sellRobot = asyncHandler(async (req, res) => {
+  const { salePrice } = req.body;
+  const user = await User.findById(req.user._id);
+  const robotToSell = await Robot.findById(req.params.id);
+  const superAdmin = await User.findOne({ isSuperAdmin: true });
+  const settings = await GameSetting.findOne({ key: 'globalSettings' });
+
+  if (!robotToSell || robotToSell.owner.toString() !== user._id.toString()) {
+    res.status(404);
+    throw new Error('Robot non trouvé ou vous n\'en êtes pas le propriétaire.');
+  }
+  if (!superAdmin) {
+    throw new Error('Configuration du SuperAdmin introuvable.');
+  }
+  if (!salePrice || salePrice <= 0) {
+    res.status(400);
+    throw new Error('Veuillez fournir un prix de vente valide.');
+  }
+
+  // Calcul de la commission
+  const commissionRate = settings.salesCommissionRate;
+  const commission = salePrice * commissionRate;
+  const userRevenue = salePrice - commission;
+
+  // Mettre à jour les soldes
+  user.keviumBalance += userRevenue;
+  superAdmin.keviumBalance += commission;
+  
+  // Retirer le robot de l'inventaire du vendeur
+  user.inventory.pull(robotToSell._id);
+
+  // Mettre à jour le robot pour le remettre en vente
+  robotToSell.owner = null;
+  robotToSell.isPlayerSale = true;
+  robotToSell.salePrice = salePrice;
+  robotToSell.stock = 1; // C'est maintenant un item unique en magasin
+
+  await robotToSell.save();
+  await user.save();
+  await superAdmin.save();
+
+  res.status(200).json({
+    message: `Robot ${robotToSell.name} vendu pour ${salePrice} KVM (vous recevez ${userRevenue} KVM après commission).`,
+    user: user,
+  });
 });
 
 // @desc    Upgrade a robot owned by the user
@@ -98,14 +163,9 @@ const upgradeRobot = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
   const robotToUpgrade = await Robot.findById(req.params.id);
 
-  if (!robotToUpgrade) {
+  if (!robotToUpgrade || robotToUpgrade.owner.toString() !== user._id.toString()) {
     res.status(404);
-    throw new Error('Robot non trouvé.');
-  }
-
-  if (robotToUpgrade.owner.toString() !== user._id.toString()) {
-    res.status(403);
-    throw new Error('Action non autorisée. Vous n\'êtes pas le propriétaire de ce robot.');
+    throw new Error('Robot non trouvé ou vous n\'en êtes pas le propriétaire.');
   }
 
   if (user.keviumBalance < robotToUpgrade.upgradeCost) {
@@ -114,7 +174,6 @@ const upgradeRobot = asyncHandler(async (req, res) => {
   }
 
   user.keviumBalance -= robotToUpgrade.upgradeCost;
-
   robotToUpgrade.level += 1;
   robotToUpgrade.miningPower = parseFloat((robotToUpgrade.miningPower * robotToUpgrade.levelUpFactor).toFixed(2));
   robotToUpgrade.upgradeCost = Math.floor(robotToUpgrade.upgradeCost * robotToUpgrade.levelUpFactor);
@@ -129,60 +188,18 @@ const upgradeRobot = asyncHandler(async (req, res) => {
   });
 });
 
-
-// @desc    Create a new robot
-// @route   POST /api/robots
-// @access  Private/Admin
+// --- ROUTES ADMIN ---
 const createRobot = asyncHandler(async (req, res) => {
-  const { name, icon, price, miningPower, rarity, stock, isSponsored, levelUpFactor, upgradeCost, category } =
-    req.body;
-
-  const robotExists = await Robot.findOne({ name, owner: null });
-  if (robotExists) {
-    res.status(400);
-    throw new Error('Un robot avec ce nom existe déjà dans le magasin');
-  }
-
-  const robot = new Robot({
-    name,
-    icon,
-    price,
-    miningPower,
-    rarity,
-    stock,
-    isSponsored,
-    levelUpFactor,
-    upgradeCost,
-    category,
-  });
-
+  const { name, icon, price, miningPower, rarity, stock, isSponsored, levelUpFactor, upgradeCost, category } = req.body;
+  const robot = new Robot({ name, icon, price, miningPower, rarity, stock, isSponsored, levelUpFactor, upgradeCost, category });
   const createdRobot = await robot.save();
   res.status(201).json(createdRobot);
 });
 
-// @desc    Update a robot
-// @route   PUT /api/robots/:id
-// @access  Private/Admin
 const updateRobot = asyncHandler(async (req, res) => {
-  const { name, icon, price, miningPower, rarity, stock, isSponsored, levelUpFactor, upgradeCost, category } =
-    req.body;
-
   const robot = await Robot.findById(req.params.id);
-
   if (robot) {
-    robot.name = name || robot.name;
-    robot.icon = icon || robot.icon;
-    robot.price = price === undefined ? robot.price : price;
-    robot.miningPower = miningPower === undefined ? robot.miningPower : miningPower;
-    robot.rarity = rarity || robot.rarity;
-    robot.stock = stock === undefined ? robot.stock : stock;
-    robot.isSponsored =
-      isSponsored !== undefined ? isSponsored : robot.isSponsored;
-    robot.levelUpFactor = levelUpFactor === undefined ? robot.levelUpFactor : levelUpFactor;
-    robot.upgradeCost = upgradeCost === undefined ? robot.upgradeCost : upgradeCost;
-    robot.category = category === undefined ? robot.category : category;
-
-
+    Object.assign(robot, req.body);
     const updatedRobot = await robot.save();
     res.json(updatedRobot);
   } else {
@@ -191,12 +208,8 @@ const updateRobot = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Delete a robot
-// @route   DELETE /api/robots/:id
-// @access  Private/Admin
 const deleteRobot = asyncHandler(async (req, res) => {
   const robot = await Robot.findById(req.params.id);
-
   if (robot) {
     await Robot.deleteOne({ _id: robot._id });
     res.json({ message: 'Robot supprimé' });
@@ -207,11 +220,6 @@ const deleteRobot = asyncHandler(async (req, res) => {
 });
 
 export {
-  createRobot,
-  getRobots,
-  getRobotById,
-  updateRobot,
-  deleteRobot,
-  purchaseRobot,
-  upgradeRobot,
+  createRobot, getRobots, getRobotById, updateRobot, deleteRobot,
+  purchaseRobot, upgradeRobot, sellRobot,
 };

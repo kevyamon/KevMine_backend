@@ -6,7 +6,8 @@ import {
   updateRobot,
   deleteRobot,
   purchaseRobot,
-  upgradeRobot, // 1. Importer la nouvelle fonction
+  upgradeRobot,
+  sellRobot, // 1. Importer la nouvelle fonction de vente
 } from '../controllers/robotController.js';
 import { protect, adminProtect } from '../middleware/authMiddleware.js';
 
@@ -15,9 +16,8 @@ const router = express.Router();
 router.route('/').get(getRobots).post(protect, adminProtect, createRobot);
 
 router.route('/:id/purchase').post(protect, purchaseRobot);
-
-// 2. AJOUT DE LA NOUVELLE ROUTE POUR L'AMÉLIORATION
 router.route('/:id/upgrade').put(protect, upgradeRobot);
+router.route('/:id/sell').post(protect, sellRobot); // 2. Ajouter la nouvelle route pour la vente
 
 router
   .route('/:id')

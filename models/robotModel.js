@@ -26,13 +26,11 @@ const robotSchema = mongoose.Schema(
       required: true,
       default: 'common',
     },
-    // ---- NOUVEAU CHAMP POUR LA CATÉGORIE ----
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
-      required: false, // On le met non-requis pour l'instant
+      required: false,
     },
-    // ----------------------------------------
     stock: {
       type: Number,
       required: true,
@@ -46,7 +44,7 @@ const robotSchema = mongoose.Schema(
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: false, // Les robots dans le magasin n'ont pas de propriétaire
+      required: false,
     },
     level: {
       type: Number,
@@ -54,12 +52,22 @@ const robotSchema = mongoose.Schema(
     },
     upgradeCost: {
       type: Number,
-      default: 100, // Coût initial pour passer au niveau 2
+      default: 100,
     },
     levelUpFactor: {
       type: Number,
-      default: 1.5, // Facteur de multiplication pour le coût et la puissance
+      default: 1.5,
     },
+    // ---- NOUVEAUX CHAMPS POUR LA VENTE PAR LES JOUEURS ----
+    isPlayerSale: {
+      type: Boolean,
+      default: false, // Vrai si le robot est une revente d'un joueur
+    },
+    salePrice: {
+      type: Number, // Le prix fixé par le joueur pour la revente
+      required: false,
+    },
+    // ----------------------------------------------------
   },
   {
     timestamps: true,
