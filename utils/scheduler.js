@@ -2,8 +2,8 @@ import cron from 'node-cron';
 import User from '../models/userModel.js';
 import asyncHandler from 'express-async-handler';
 
-// Cette fonction met à jour le classement de tous les joueurs
-const updatePlayerRanks = asyncHandler(async () => {
+// On ajoute "export" pour rendre cette fonction importable par d'autres fichiers
+export const updatePlayerRanks = asyncHandler(async () => {
   console.log('Running daily rank update...');
 
   // 1. Récupérer tous les joueurs non-admin, triés par leur richesse
