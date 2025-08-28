@@ -5,6 +5,7 @@ const robotSchema = mongoose.Schema(
     name: {
       type: String,
       required: true,
+      trim: true, // Ajout pour enlever les espaces inutiles
     },
     icon: {
       type: String,
@@ -62,18 +63,19 @@ const robotSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    // ---- MODIFICATION CLÉ ----
-    // Ce champ remplacera 'salePrice' et gardera la trace de l'investissement total
     investedKevium: {
       type: Number,
       default: 0,
     },
-    // -------------------------
   },
   {
     timestamps: true,
   }
 );
+
+// CORRECTION : Création d'un index partiel.
+// Le nom du robot est unique UNIQUEMENT pour les robots de la boutique (ceux sans propriétaire).
+robotSchema.index({ name: 1 }, { unique: true, partialFilterExpression: { owner: null } });
 
 const Robot = mongoose.model('Robot', robotSchema);
 
