@@ -8,7 +8,8 @@ import robotRoutes from './routes/robotRoutes.js';
 import logRoutes from './routes/logRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
-import questRoutes from './routes/questRoutes.js'; // 1. Importer les nouvelles routes
+import questRoutes from './routes/questRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js'; // 1. Importer
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import cors from 'cors';
 import http from 'http';
@@ -63,7 +64,8 @@ app.use('/api/robots', robotRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/categories', categoryRoutes);
-app.use('/api/quests', questRoutes); // 2. Intégrer les routes des quêtes
+app.use('/api/quests', questRoutes);
+app.use('/api/dashboard', dashboardRoutes); // 2. Intégrer
 
 // Ping endpoint to keep the server awake
 app.get('/ping', (req, res) => {
