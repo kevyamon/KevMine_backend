@@ -52,11 +52,7 @@ const authUser = asyncHandler(async (req, res) => {
     await generateTokens(res, user._id);
     await user.resetLoginAttempts();
 
-    // ---- LOGIQUE SUPERADMIN ----
     const userData = user.toObject();
-    if (userData.email === process.env.SUPER_ADMIN_EMAIL) {
-        userData.keviumBalance = 99999999999999999999999; // Solde illimité
-    }
     delete userData.password; // Ne jamais renvoyer le mot de passe
 
     res.status(200).json({ ...userData, isNewUser });
@@ -103,25 +99,27 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error('Un utilisateur avec cet email existe déjà');
   }
 
-  // ---- LOGIQUE SUPERADMIN ----
   const isSuperAdmin = email === process.env.SUPER_ADMIN_EMAIL;
 
-  const user = await User.create({
+  const userDataToCreate = {
     name,
     email,
     password,
-    isAdmin: isSuperAdmin, // Le SuperAdmin est aussi un Admin
+    isAdmin: isSuperAdmin,
     isSuperAdmin: isSuperAdmin,
-  });
+  };
+
+  if (isSuperAdmin) {
+    userDataToCreate.keviumBalance = 999999999999999999999999999999999;
+  }
+
+  const user = await User.create(userDataToCreate);
 
   if (user) {
     const isNewUser = true;
     await generateTokens(res, user._id);
 
     const userData = user.toObject();
-    if (isSuperAdmin) {
-        userData.keviumBalance = 999999999;
-    }
     delete userData.password;
 
     res.status(201).json({ ...userData, isNewUser });
@@ -200,13 +198,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).populate('inventory');
 
   if (user) {
-    const userData = user.toObject();
-    // ---- LOGIQUE SUPERADMIN ----
-    if (userData.email === process.env.SUPER_ADMIN_EMAIL) {
-        userData.keviumBalance = 999999999;
-    }
-    
-    res.status(200).json(userData);
+    res.status(200).json(user);
   } else {
     res.status(404);
     throw new Error('Utilisateur non trouvé');
@@ -230,11 +222,6 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 
     const updatedUser = await user.save();
     const userData = updatedUser.toObject();
-
-    // ---- LOGIQUE SUPERADMIN ----
-    if (userData.email === process.env.SUPER_ADMIN_EMAIL) {
-        userData.keviumBalance = 999999999;
-    }
     delete userData.password;
 
     res.status(200).json(userData);
