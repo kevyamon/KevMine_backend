@@ -5,16 +5,22 @@ import {
   getRobotById,
   updateRobot,
   deleteRobot,
+  purchaseRobot, // 1. Importer la nouvelle fonction
 } from '../controllers/robotController.js';
-import { adminProtect } from '../middleware/authMiddleware.js';
+import { protect, adminProtect } from '../middleware/authMiddleware.js'; // 2. Importer 'protect'
 
 const router = express.Router();
 
-router.route('/').get(getRobots).post(adminProtect, createRobot);
+// 3. J'ai aussi ajouté 'protect' aux routes admin pour plus de sécurité
+router.route('/').get(getRobots).post(protect, adminProtect, createRobot);
+
+// 4. Ajout de la nouvelle route pour l'achat
+router.route('/:id/purchase').post(protect, purchaseRobot);
+
 router
   .route('/:id')
   .get(getRobotById)
-  .put(adminProtect, updateRobot)
-  .delete(adminProtect, deleteRobot);
+  .put(protect, adminProtect, updateRobot)
+  .delete(protect, adminProtect, deleteRobot);
 
 export default router;
