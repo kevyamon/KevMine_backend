@@ -4,7 +4,7 @@ import User from '../models/userModel.js';
 import GameSetting from '../models/gameSettingModel.js';
 import sendEmail from '../utils/emailService.js';
 import { getPurchaseConfirmationTemplate } from '../utils/emailTemplates.js';
-import { updateQuestProgress } from '../utils/questService.js'; // 1. Importer le service de quêtes
+import { updateQuestProgress } from '../utils/questService.js';
 
 // @desc    Get all robots for the store
 // @route   GET /api/robots
@@ -66,7 +66,6 @@ const purchaseRobot = asyncHandler(async (req, res) => {
   user.purchaseHistory.push({ robotName: purchasedRobot.name, price: price, purchaseDate: new Date() });
   const updatedUser = await user.save();
   
-  // 2. Mettre à jour la progression de la quête d'achat
   await updateQuestProgress(req.user._id, 'PURCHASE_ROBOT', 1);
 
   const emailContent = getPurchaseConfirmationTemplate(user.name, purchasedRobot.name, purchasedRobot.icon, price, updatedUser.keviumBalance);
@@ -110,12 +109,12 @@ const sellRobot = asyncHandler(async (req, res) => {
     robotToSell.price = salePrice;
     robotToSell.stock = 1;
     robotToSell.investedKevium = 0;
+    robotToSell.isSponsored = false; // <-- LA CORRECTION EST ICI
 
     await robotToSell.save();
     await user.save();
     await superAdmin.save();
     
-    // 3. Mettre à jour la progression de la quête de vente
     await updateQuestProgress(req.user._id, 'SELL_ROBOT', 1);
 
     res.status(200).json({
@@ -145,7 +144,6 @@ const upgradeRobot = asyncHandler(async (req, res) => {
   await robotToUpgrade.save();
   const updatedUser = await user.save();
   
-  // 4. Mettre à jour la progression de la quête d'amélioration
   await updateQuestProgress(req.user._id, 'UPGRADE_ROBOT', 1);
 
   res.status(200).json({ message: `${robotToUpgrade.name} amélioré au niveau ${robotToUpgrade.level} !`, robot: robotToUpgrade, user: updatedUser });
