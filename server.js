@@ -6,7 +6,8 @@ import userRoutes from './routes/userRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import robotRoutes from './routes/robotRoutes.js';
 import logRoutes from './routes/logRoutes.js';
-import gameRoutes from './routes/gameRoutes.js'; // 1. Importer les nouvelles routes
+import gameRoutes from './routes/gameRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js'; // 1. Importer les routes de catégories
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import cors from 'cors';
 import http from 'http';
@@ -58,7 +59,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/robots', robotRoutes);
 app.use('/api/logs', logRoutes);
-app.use('/api/game', gameRoutes); // 2. Utiliser les nouvelles routes
+app.use('/api/game', gameRoutes);
+app.use('/api/categories', categoryRoutes); // 2. Utiliser les nouvelles routes
 
 // Ping endpoint to keep the server awake
 app.get('/ping', (req, res) => {

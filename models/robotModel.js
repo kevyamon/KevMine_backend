@@ -5,8 +5,6 @@ const robotSchema = mongoose.Schema(
     name: {
       type: String,
       required: true,
-      // unique n'est pertinent que pour les robots du magasin, pas ceux des joueurs
-      // unique: true, 
     },
     icon: {
       type: String,
@@ -28,6 +26,13 @@ const robotSchema = mongoose.Schema(
       required: true,
       default: 'common',
     },
+    // ---- NOUVEAU CHAMP POUR LA CATÉGORIE ----
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      required: false, // On le met non-requis pour l'instant
+    },
+    // ----------------------------------------
     stock: {
       type: Number,
       required: true,
@@ -43,7 +48,6 @@ const robotSchema = mongoose.Schema(
       ref: 'User',
       required: false, // Les robots dans le magasin n'ont pas de propriétaire
     },
-    // ---- NOUVEAUX CHAMPS POUR L'AMÉLIORATION ----
     level: {
       type: Number,
       default: 1,
@@ -56,7 +60,6 @@ const robotSchema = mongoose.Schema(
       type: Number,
       default: 1.5, // Facteur de multiplication pour le coût et la puissance
     },
-    // ------------------------------------------
   },
   {
     timestamps: true,
