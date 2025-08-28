@@ -4,6 +4,7 @@ import User from '../models/userModel.js';
 import GameSetting from '../models/gameSettingModel.js';
 import sendEmail from '../utils/emailService.js';
 import { getPurchaseConfirmationTemplate } from '../utils/emailTemplates.js';
+import { updateQuestProgress } from '../utils/questService.js'; // 1. Importer le service de quêtes
 
 // @desc    Get all robots for the store
 // @route   GET /api/robots
@@ -62,9 +63,11 @@ const purchaseRobot = asyncHandler(async (req, res) => {
   }
 
   user.inventory.push(purchasedRobot._id);
-  // Correction: On ne stocke plus l'ID du robot dans l'historique car le robot peut être supprimé
   user.purchaseHistory.push({ robotName: purchasedRobot.name, price: price, purchaseDate: new Date() });
   const updatedUser = await user.save();
+  
+  // 2. Mettre à jour la progression de la quête d'achat
+  await updateQuestProgress(req.user._id, 'PURCHASE_ROBOT', 1);
 
   const emailContent = getPurchaseConfirmationTemplate(user.name, purchasedRobot.name, purchasedRobot.icon, price, updatedUser.keviumBalance);
   await sendEmail({ email: user.email, subject: `Confirmation d'achat - ${purchasedRobot.name}`, htmlContent: emailContent });
@@ -95,14 +98,12 @@ const sellRobot = asyncHandler(async (req, res) => {
     
     user.inventory.pull(robotToSell._id);
 
-    // ---- AJOUT À L'HISTORIQUE DES VENTES ----
     user.salesHistory.push({
       robotName: robotToSell.name,
       salePrice: salePrice,
       userRevenue: userTotalReturn,
       saleDate: new Date(),
     });
-    // -----------------------------------------
 
     robotToSell.owner = null;
     robotToSell.isPlayerSale = true;
@@ -113,6 +114,9 @@ const sellRobot = asyncHandler(async (req, res) => {
     await robotToSell.save();
     await user.save();
     await superAdmin.save();
+    
+    // 3. Mettre à jour la progression de la quête de vente
+    await updateQuestProgress(req.user._id, 'SELL_ROBOT', 1);
 
     res.status(200).json({
       message: `Robot ${robotToSell.name} vendu pour ${salePrice} KVM. Vous recevez ${userTotalReturn} KVM.`,
@@ -140,6 +144,9 @@ const upgradeRobot = asyncHandler(async (req, res) => {
   
   await robotToUpgrade.save();
   const updatedUser = await user.save();
+  
+  // 4. Mettre à jour la progression de la quête d'amélioration
+  await updateQuestProgress(req.user._id, 'UPGRADE_ROBOT', 1);
 
   res.status(200).json({ message: `${robotToUpgrade.name} amélioré au niveau ${robotToUpgrade.level} !`, robot: robotToUpgrade, user: updatedUser });
 });

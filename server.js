@@ -8,12 +8,13 @@ import robotRoutes from './routes/robotRoutes.js';
 import logRoutes from './routes/logRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
+import questRoutes from './routes/questRoutes.js'; // 1. Importer les nouvelles routes
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import cors from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
 import socketHandler from './socket/socketHandler.js';
-import startRankUpdateScheduler from './utils/scheduler.js'; // 1. Importer le planificateur
+import startRankUpdateScheduler from './utils/scheduler.js';
 import path from 'path';
 
 dotenv.config();
@@ -62,6 +63,7 @@ app.use('/api/robots', robotRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/quests', questRoutes); // 2. Intégrer les routes des quêtes
 
 // Ping endpoint to keep the server awake
 app.get('/ping', (req, res) => {
@@ -90,6 +92,5 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  // 2. Démarrer le planificateur de tâches une fois le serveur lancé
   startRankUpdateScheduler();
 });

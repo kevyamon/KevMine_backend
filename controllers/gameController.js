@@ -1,5 +1,6 @@
 import asyncHandler from 'express-async-handler';
 import User from '../models/userModel.js';
+import { updateQuestProgress } from '../utils/questService.js'; // 1. Importer le service de quêtes
 
 // @desc    Update user's unclaimed Kevium based on mining power and time
 // @route   GET /api/game/status
@@ -41,6 +42,11 @@ const claimKevium = asyncHandler(async (req, res) => {
   user.unclaimedKevium = 0;
   user.lastKvmUpdate = now;
   const updatedUser = await user.save();
+  
+  // 2. Mettre à jour la progression de la quête après avoir réclamé
+  // On passe le montant exact pour les quêtes de type 'récolter X KVM'
+  await updateQuestProgress(req.user._id, 'CLAIM_KVM', amountToClaim);
+  
   res.json({ message: `${amountToClaim.toFixed(2)} KVM réclamés avec succès !`, keviumBalance: updatedUser.keviumBalance, unclaimedKevium: updatedUser.unclaimedKevium });
 });
 
