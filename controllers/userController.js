@@ -7,6 +7,8 @@ import crypto from 'crypto';
 import RefreshToken from '../models/refreshTokenModel.js';
 import jwt from 'jsonwebtoken';
 
+// ... (les fonctions authUser, registerUser, refreshAccessToken, logoutUser restent les mêmes)
+
 // @desc    Auth user & get token
 // @route   POST /api/users/login
 // @access  Public
@@ -203,7 +205,6 @@ const logoutUser = asyncHandler(async (req, res) => {
 // @route   GET /api/users/profile
 // @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
-  // CORRECTION : On peuple l'inventaire ET la catégorie de chaque robot
   const user = await User.findById(req.user._id).populate({
     path: 'inventory',
     populate: {
@@ -220,7 +221,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Update user profile
+// @desc    Update user profile (text data only)
 // @route   PUT /api/users/profile
 // @access  Private
 const updateUserProfile = asyncHandler(async (req, res) => {
@@ -229,7 +230,6 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   if (user) {
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
-    user.photo = req.body.photo || user.photo;
     user.phone = req.body.phone || user.phone;
 
     if (req.body.password) {
@@ -246,6 +246,36 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     throw new Error('Utilisateur non trouvé');
   }
 });
+
+// --- NOUVELLE FONCTION POUR L'UPLOAD DE PHOTO ---
+// @desc    Update user profile photo
+// @route   PUT /api/users/profile/photo
+// @access  Private
+const updateUserProfilePhoto = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (user) {
+    if (req.file) {
+      user.photo = req.file.path; // L'URL sécurisée de Cloudinary
+    } else {
+      res.status(400);
+      throw new Error("Aucun fichier n'a été téléversé.");
+    }
+    
+    const updatedUser = await user.save();
+    const userData = updatedUser.toObject();
+    delete userData.password;
+
+    res.status(200).json(userData);
+  } else {
+    res.status(404);
+    throw new Error('Utilisateur non trouvé');
+  }
+});
+// ---------------------------------------------
+
+
+// ... (les fonctions forgotPassword et resetPassword restent les mêmes)
 
 // @desc    Forgot password
 // @route   POST /api/users/forgot-password
@@ -334,4 +364,5 @@ export {
   forgotPassword,
   resetPassword,
   refreshAccessToken,
+  updateUserProfilePhoto, // Ne pas oublier d'exporter la nouvelle fonction
 };
