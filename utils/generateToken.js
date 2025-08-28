@@ -22,14 +22,16 @@ const generateTokens = async (res, userId) => {
   res.cookie('jwt', accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV !== 'development',
-    sameSite: 'strict',
+    // LA CORRECTION EST ICI
+    sameSite: process.env.NODE_ENV === 'development' ? 'strict' : 'none',
     maxAge: 15 * 60 * 1000, // 15 minutes
   });
 
   res.cookie('refresh', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV !== 'development',
-    sameSite: 'strict',
+    // ET ICI
+    sameSite: process.env.NODE_ENV === 'development' ? 'strict' : 'none',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 };
