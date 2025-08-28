@@ -11,19 +11,22 @@ import jwt from 'jsonwebtoken';
 // @route   POST /api/users/login
 // @access  Public
 const authUser = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { identifier, password } = req.body;
 
-  const user = await User.findOne({ email });
+  // Chercher l'utilisateur par email, nom ou téléphone
+  const user = await User.findOne({
+    $or: [{ email: identifier }, { name: identifier }, { phone: identifier }],
+  });
 
   if (!user) {
     await Log.create({
       action: 'login_fail',
-      description: `Tentative de connexion échouée pour l'email: ${email}`,
-      email: email,
+      description: `Tentative de connexion échouée pour l'identifiant: ${identifier}`,
+      email: identifier, // On log l'identifiant utilisé
       ip: req.ip,
     });
     res.status(401);
-    throw new Error('Email ou mot de passe invalide');
+    throw new Error('Identifiant ou mot de passe invalide');
   }
 
   if (user.isLocked) {
@@ -53,7 +56,7 @@ const authUser = asyncHandler(async (req, res) => {
     await user.resetLoginAttempts();
 
     const userData = user.toObject();
-    delete userData.password; // Ne jamais renvoyer le mot de passe
+    delete userData.password;
 
     res.status(200).json({ ...userData, isNewUser });
     
@@ -82,7 +85,7 @@ const authUser = asyncHandler(async (req, res) => {
     }
 
     res.status(401);
-    throw new Error('Email ou mot de passe invalide');
+    throw new Error('Identifiant ou mot de passe invalide');
   }
 });
 
@@ -90,13 +93,20 @@ const authUser = asyncHandler(async (req, res) => {
 // @route   POST /api/users
 // @access  Public
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, phone } = req.body;
 
-  const userExists = await User.findOne({ email });
-
+  const userExists = await User.findOne({ $or: [{ email }, { name }] });
   if (userExists) {
     res.status(400);
-    throw new Error('Un utilisateur avec cet email existe déjà');
+    throw new Error('Un utilisateur avec cet email ou ce nom existe déjà');
+  }
+
+  if (phone) {
+    const phoneExists = await User.findOne({ phone });
+    if (phoneExists) {
+      res.status(400);
+      throw new Error('Un utilisateur avec ce numéro de téléphone existe déjà');
+    }
   }
 
   const isSuperAdmin = email === process.env.SUPER_ADMIN_EMAIL;
@@ -105,12 +115,13 @@ const registerUser = asyncHandler(async (req, res) => {
     name,
     email,
     password,
+    phone, // On ajoute le téléphone ici
     isAdmin: isSuperAdmin,
     isSuperAdmin: isSuperAdmin,
   };
 
   if (isSuperAdmin) {
-    userDataToCreate.keviumBalance = 999999999999999999999999999999999;
+    userDataToCreate.keviumBalance = 999999999;
   }
 
   const user = await User.create(userDataToCreate);
@@ -118,10 +129,8 @@ const registerUser = asyncHandler(async (req, res) => {
   if (user) {
     const isNewUser = true;
     await generateTokens(res, user._id);
-
     const userData = user.toObject();
     delete userData.password;
-
     res.status(201).json({ ...userData, isNewUser });
   } else {
     res.status(400);
@@ -215,6 +224,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
     user.photo = req.body.photo || user.photo;
+    user.phone = req.body.phone || user.phone; // Permettre la mise à jour du numéro
 
     if (req.body.password) {
       user.password = req.body.password;

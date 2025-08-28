@@ -14,6 +14,9 @@ const userRegisterSchema = Joi.object({
     'string.email': 'L\'email doit être une adresse email valide.',
     'any.required': 'L\'email est requis.',
   }),
+  phone: Joi.string().trim().optional().allow('').messages({ // On ajoute la validation pour le téléphone
+    'string.base': 'Le numéro de téléphone doit être une chaîne de caractères.',
+  }),
   password: Joi.string().min(6).required().messages({
     'string.base': 'Le mot de passe doit être une chaîne de caractères.',
     'string.empty': 'Le mot de passe ne peut pas être vide.',
@@ -23,11 +26,11 @@ const userRegisterSchema = Joi.object({
 });
 
 const userLoginSchema = Joi.object({
-  email: Joi.string().trim().email().required().messages({
-    'string.base': 'L\'email doit être une chaîne de caractères.',
-    'string.empty': 'L\'email ne peut pas être vide.',
-    'string.email': 'L\'email doit être une adresse email valide.',
-    'any.required': 'L\'email est requis.',
+  // Mise à jour de ce champ pour accepter email ou nom d'utilisateur/téléphone
+  identifier: Joi.string().trim().required().messages({
+    'string.base': 'L\'identifiant doit être une chaîne de caractères.',
+    'string.empty': 'L\'identifiant ne peut pas être vide.',
+    'any.required': 'L\'identifiant est requis.',
   }),
   password: Joi.string().required().messages({
     'string.base': 'Le mot de passe doit être une chaîne de caractères.',

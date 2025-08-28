@@ -5,7 +5,8 @@ const loginLimiter = rateLimit({
   max: 5, // 5 requests per user per 15 minutes
   message: 'Too many login attempts from this IP, please try again after 15 minutes',
   keyGenerator: (req, res) => {
-    return req.body.email;
+    // On se base maintenant sur l'identifiant générique (email, nom ou téléphone)
+    return req.body.identifier;
   },
   handler: (req, res) => {
     res.status(429).json({

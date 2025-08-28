@@ -13,6 +13,12 @@ const userSchema = mongoose.Schema(
       required: true,
       unique: true,
     },
+    phone: {
+      type: String,
+      required: false, // On ne le rend pas obligatoire pour l'instant
+      unique: true,
+      sparse: true, // Important pour permettre plusieurs documents avec une valeur nulle
+    },
     password: {
       type: String,
       required: true,
