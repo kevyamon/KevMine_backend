@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  protect, // On importe la protection simple
   adminProtect,
   superAdminProtect,
 } from '../middleware/authMiddleware.js';
@@ -15,17 +16,19 @@ import {
 import {
   getSettings,
   updateSettings,
-} from '../controllers/gameSettingsController.js'; // 1. Importer les nouvelles fonctions
+} from '../controllers/gameSettingsController.js';
 
 const router = express.Router();
 
-router.use(adminProtect); // Protection de base pour toutes les routes admin
+// ---- ROUTE POUR LES PARAMÈTRES DU JEU ----
+// Tout utilisateur connecté peut voir les paramètres
+router.route('/settings').get(protect, getSettings); 
+// Seul le SuperAdmin peut les modifier
+router.route('/settings').put(protect, superAdminProtect, updateSettings);
 
-// ---- ROUTES POUR LES PARAMÈTRES DU JEU ----
-router
-  .route('/settings')
-  .get(getSettings) // Les admins peuvent voir les paramètres
-  .put(superAdminProtect, updateSettings); // Seul le SuperAdmin peut les modifier
+
+// ---- ROUTES PROTÉGÉES POUR LES ADMINS ----
+router.use(adminProtect);
 
 // ---- ROUTES POUR LES UTILISATEURS ----
 router.route('/').get(getUsers);
