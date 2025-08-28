@@ -69,16 +69,24 @@ const userSchema = mongoose.Schema(
         purchaseDate: { type: Date, default: Date.now },
       },
     ],
-    // ---- NOUVEAU CHAMP POUR L'HISTORIQUE DES VENTES ----
     salesHistory: [
       {
         robotName: { type: String },
-        salePrice: { type: Number }, // Prix auquel le robot a été vendu
-        userRevenue: { type: Number }, // Montant net reçu par le joueur
+        salePrice: { type: Number },
+        userRevenue: { type: Number },
         saleDate: { type: Date, default: Date.now },
       }
     ],
-    // --------------------------------------------------
+    // ---- NOUVEAUX CHAMPS POUR LE CLASSEMENT ----
+    rank: {
+      type: Number,
+      default: 0, // 0 signifie non classé
+    },
+    previousRank: {
+      type: Number,
+      default: 0, // Le rang de la période précédente
+    },
+    // ---------------------------------------------
     resetPasswordToken: String,
     resetPasswordExpire: Date,
     loginAttempts: {

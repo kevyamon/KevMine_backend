@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-  protect, // On importe la protection simple
+  protect,
   adminProtect,
   superAdminProtect,
 } from '../middleware/authMiddleware.js';
@@ -12,6 +12,7 @@ import {
   updateUser,
   updateUserStatus,
   unlockUser,
+  triggerRankUpdate, // 1. Importer la fonction
 } from '../controllers/adminController.js';
 import {
   getSettings,
@@ -20,26 +21,27 @@ import {
 
 const router = express.Router();
 
-// ---- ROUTE POUR LES PARAMÈTRES DU JEU ----
-// Tout utilisateur connecté peut voir les paramètres
-router.route('/settings').get(protect, getSettings); 
-// Seul le SuperAdmin peut les modifier
+// ---- ROUTES PUBLIQUES POUR LES CONNECTÉS ----
+router.route('/settings').get(protect, getSettings);
+
+// ---- ROUTES SUPER ADMIN ----
 router.route('/settings').put(protect, superAdminProtect, updateSettings);
+// 2. Nouvelle route pour déclencher la mise à jour du classement
+router.route('/trigger-rank-update').post(protect, superAdminProtect, triggerRankUpdate);
 
 
-// ---- ROUTES PROTÉGÉES POUR LES ADMINS ----
+// ---- ROUTES ADMIN ----
 router.use(adminProtect);
 
-// ---- ROUTES POUR LES UTILISATEURS ----
-router.route('/').get(getUsers);
-router.route('/locked-users').get(getLockedUsers);
-router.route('/:id/unlock').put(unlockUser);
+router.route('/users').get(getUsers); // Renommé pour plus de clarté
+router.route('/users/locked').get(getLockedUsers); // Renommé pour plus de clarté
+router.route('/users/:id/unlock').put(unlockUser);
 router
-  .route('/:id')
+  .route('/users/:id')
   .get(getUserById)
   .put(updateUser)
   .delete(deleteUser);
 
-router.route('/:id/status').put(superAdminProtect, updateUserStatus);
+router.route('/users/:id/status').put(superAdminProtect, updateUserStatus);
 
 export default router;

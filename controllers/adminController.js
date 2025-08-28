@@ -4,6 +4,7 @@ import Log from '../models/logModel.js';
 import generateTokens from '../utils/generateToken.js';
 import sendEmail from '../utils/emailService.js';
 import { getStatusChangeTemplate } from '../utils/emailTemplates.js';
+import { updatePlayerRanks } from '../utils/scheduler.js'; // 1. Importer la fonction de mise à jour
 
 // @desc    Get all users
 // @route   GET /api/admin/users
@@ -13,6 +14,22 @@ const getUsers = asyncHandler(async (req, res) => {
   res.json(users);
 });
 
+// @desc    Trigger a manual rank update
+// @route   POST /api/admin/trigger-rank-update
+// @access  Private/SuperAdmin
+const triggerRankUpdate = asyncHandler(async (req, res) => {
+  try {
+    // 2. Appeler la fonction manuellement
+    await updatePlayerRanks();
+    res.status(200).json({ message: 'Mise à jour manuelle du classement terminée avec succès.' });
+  } catch (error) {
+    res.status(500);
+    throw new Error('Une erreur est survenue lors de la mise à jour du classement.');
+  }
+});
+
+
+// ... (le reste du fichier reste identique)
 // @desc    Get all locked users
 // @route   GET /api/admin/locked-users
 // @access  Private/Admin
@@ -217,6 +234,7 @@ const unlockUser = asyncHandler(async (req, res) => {
     }
 });
 
+
 export {
   getUsers,
   getLockedUsers,
@@ -225,4 +243,5 @@ export {
   updateUser,
   updateUserStatus,
   unlockUser,
+  triggerRankUpdate, // 3. Exporter la nouvelle fonction
 };
