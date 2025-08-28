@@ -58,16 +58,17 @@ const robotSchema = mongoose.Schema(
       type: Number,
       default: 1.5,
     },
-    // ---- NOUVEAUX CHAMPS POUR LA VENTE PAR LES JOUEURS ----
     isPlayerSale: {
       type: Boolean,
-      default: false, // Vrai si le robot est une revente d'un joueur
+      default: false,
     },
-    salePrice: {
-      type: Number, // Le prix fixé par le joueur pour la revente
-      required: false,
+    // ---- MODIFICATION CLÉ ----
+    // Ce champ remplacera 'salePrice' et gardera la trace de l'investissement total
+    investedKevium: {
+      type: Number,
+      default: 0,
     },
-    // ----------------------------------------------------
+    // -------------------------
   },
   {
     timestamps: true,
