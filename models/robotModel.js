@@ -5,7 +5,8 @@ const robotSchema = mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true,
+      // unique n'est pertinent que pour les robots du magasin, pas ceux des joueurs
+      // unique: true, 
     },
     icon: {
       type: String,
@@ -40,8 +41,22 @@ const robotSchema = mongoose.Schema(
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: false, // Robots in store don't have an owner
+      required: false, // Les robots dans le magasin n'ont pas de propriétaire
     },
+    // ---- NOUVEAUX CHAMPS POUR L'AMÉLIORATION ----
+    level: {
+      type: Number,
+      default: 1,
+    },
+    upgradeCost: {
+      type: Number,
+      default: 100, // Coût initial pour passer au niveau 2
+    },
+    levelUpFactor: {
+      type: Number,
+      default: 1.5, // Facteur de multiplication pour le coût et la puissance
+    },
+    // ------------------------------------------
   },
   {
     timestamps: true,

@@ -60,8 +60,9 @@ const purchaseRobot = asyncHandler(async (req, res) => {
     _id: undefined,
     owner: user._id,
     stock: 0,
+    name: robot.name, // S'assurer que le nom est bien copié
   });
-  
+
   await userRobot.save();
 
   user.inventory.push(userRobot._id);
@@ -92,17 +93,61 @@ const purchaseRobot = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Achat réussi !', user: updatedUser });
 });
 
+// @desc    Upgrade a robot owned by the user
+// @route   PUT /api/robots/:id/upgrade
+// @access  Private
+const upgradeRobot = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  const robotToUpgrade = await Robot.findById(req.params.id);
+
+  // 1. Vérifier si le robot existe
+  if (!robotToUpgrade) {
+    res.status(404);
+    throw new Error('Robot non trouvé.');
+  }
+
+  // 2. Vérifier si l'utilisateur est bien le propriétaire du robot
+  if (robotToUpgrade.owner.toString() !== user._id.toString()) {
+    res.status(403);
+    throw new Error('Action non autorisée. Vous n\'êtes pas le propriétaire de ce robot.');
+  }
+
+  // 3. Vérifier si l'utilisateur a assez de Kevium
+  if (user.keviumBalance < robotToUpgrade.upgradeCost) {
+    res.status(400);
+    throw new Error('Solde de Kevium insuffisant pour cette amélioration.');
+  }
+
+  // 4. Appliquer la transaction
+  user.keviumBalance -= robotToUpgrade.upgradeCost;
+
+  // 5. Mettre à jour les stats du robot
+  robotToUpgrade.level += 1;
+  robotToUpgrade.miningPower = parseFloat((robotToUpgrade.miningPower * robotToUpgrade.levelUpFactor).toFixed(2));
+  robotToUpgrade.upgradeCost = Math.floor(robotToUpgrade.upgradeCost * robotToUpgrade.levelUpFactor);
+  
+  await robotToUpgrade.save();
+  const updatedUser = await user.save();
+
+  res.status(200).json({
+    message: `${robotToUpgrade.name} amélioré au niveau ${robotToUpgrade.level} !`,
+    robot: robotToUpgrade,
+    user: updatedUser,
+  });
+});
+
+
 // @desc    Create a new robot
 // @route   POST /api/robots
 // @access  Private/Admin
 const createRobot = asyncHandler(async (req, res) => {
-  const { name, icon, price, miningPower, rarity, stock, isSponsored } =
+  const { name, icon, price, miningPower, rarity, stock, isSponsored, levelUpFactor, upgradeCost } =
     req.body;
 
-  const robotExists = await Robot.findOne({ name });
+  const robotExists = await Robot.findOne({ name, owner: null });
   if (robotExists) {
     res.status(400);
-    throw new Error('Un robot avec ce nom existe déjà');
+    throw new Error('Un robot avec ce nom existe déjà dans le magasin');
   }
 
   const robot = new Robot({
@@ -113,6 +158,8 @@ const createRobot = asyncHandler(async (req, res) => {
     rarity,
     stock,
     isSponsored,
+    levelUpFactor,
+    upgradeCost,
   });
 
   const createdRobot = await robot.save();
@@ -123,7 +170,7 @@ const createRobot = asyncHandler(async (req, res) => {
 // @route   PUT /api/robots/:id
 // @access  Private/Admin
 const updateRobot = asyncHandler(async (req, res) => {
-  const { name, icon, price, miningPower, rarity, stock, isSponsored } =
+  const { name, icon, price, miningPower, rarity, stock, isSponsored, levelUpFactor, upgradeCost } =
     req.body;
 
   const robot = await Robot.findById(req.params.id);
@@ -137,6 +184,8 @@ const updateRobot = asyncHandler(async (req, res) => {
     robot.stock = stock === undefined ? robot.stock : stock;
     robot.isSponsored =
       isSponsored !== undefined ? isSponsored : robot.isSponsored;
+    robot.levelUpFactor = levelUpFactor === undefined ? robot.levelUpFactor : levelUpFactor;
+    robot.upgradeCost = upgradeCost === undefined ? robot.upgradeCost : upgradeCost;
 
     const updatedRobot = await robot.save();
     res.json(updatedRobot);
@@ -168,4 +217,5 @@ export {
   updateRobot,
   deleteRobot,
   purchaseRobot,
+  upgradeRobot, // Ne pas oublier d'exporter la nouvelle fonction
 };
