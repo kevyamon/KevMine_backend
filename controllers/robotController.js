@@ -43,7 +43,6 @@ const purchaseRobot = asyncHandler(async (req, res) => {
     robotToPurchase.owner = user._id;
     robotToPurchase.isPlayerSale = false;
     robotToPurchase.stock = 0;
-    // L'investissement est le prix payé sur le marché de l'occasion
     robotToPurchase.investedKevium = price;
     purchasedRobot = await robotToPurchase.save();
   } else {
@@ -57,13 +56,14 @@ const purchaseRobot = asyncHandler(async (req, res) => {
       owner: user._id,
       stock: 0,
       isPlayerSale: false,
-      investedKevium: price, // L'investissement initial est le prix d'achat
+      investedKevium: price,
     });
     await purchasedRobot.save();
   }
 
   user.inventory.push(purchasedRobot._id);
-  user.purchaseHistory.push({ robotId: purchasedRobot._id, robotName: purchasedRobot.name, price: price, purchaseDate: new Date() });
+  // Correction: On ne stocke plus l'ID du robot dans l'historique car le robot peut être supprimé
+  user.purchaseHistory.push({ robotName: purchasedRobot.name, price: price, purchaseDate: new Date() });
   const updatedUser = await user.save();
 
   const emailContent = getPurchaseConfirmationTemplate(user.name, purchasedRobot.name, purchasedRobot.icon, price, updatedUser.keviumBalance);
@@ -76,42 +76,48 @@ const purchaseRobot = asyncHandler(async (req, res) => {
 // @route   POST /api/robots/:id/sell
 // @access  Private
 const sellRobot = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  const robotToSell = await Robot.findById(req.params.id);
-  const superAdmin = await User.findOne({ isSuperAdmin: true });
-  const settings = await GameSetting.findOne({ key: 'globalSettings' });
+    const user = await User.findById(req.user._id);
+    const robotToSell = await Robot.findById(req.params.id);
+    const superAdmin = await User.findOne({ isSuperAdmin: true });
+    const settings = await GameSetting.findOne({ key: 'globalSettings' });
 
-  if (!robotToSell || robotToSell.owner.toString() !== user._id.toString()) { res.status(404); throw new Error('Robot non trouvé ou vous n\'en êtes pas le propriétaire.'); }
-  if (!superAdmin) { throw new Error('Configuration du SuperAdmin introuvable.'); }
-  
-  const investedValue = robotToSell.investedKevium;
-  const salePrice = Math.floor(investedValue * 1.4); // Prix de revente = valeur investie + 40%
-  const commissionRate = settings.salesCommissionRate;
-  const commission = Math.floor(investedValue * commissionRate); // Commission basée sur la valeur investie
-  const userTotalReturn = salePrice - commission;
+    if (!robotToSell || robotToSell.owner.toString() !== user._id.toString()) { res.status(404); throw new Error('Robot non trouvé ou vous n\'en êtes pas le propriétaire.'); }
+    if (!superAdmin) { throw new Error('Configuration du SuperAdmin introuvable.'); }
+    
+    const investedValue = robotToSell.investedKevium;
+    const salePrice = Math.floor(investedValue * 1.4);
+    const commissionRate = settings.salesCommissionRate;
+    const commission = Math.floor(investedValue * commissionRate);
+    const userTotalReturn = salePrice - commission;
 
-  // Mettre à jour les soldes
-  user.keviumBalance += userTotalReturn;
-  superAdmin.keviumBalance += commission;
-  
-  // Retirer le robot de l'inventaire du vendeur
-  user.inventory.pull(robotToSell._id);
+    user.keviumBalance += userTotalReturn;
+    superAdmin.keviumBalance += commission;
+    
+    user.inventory.pull(robotToSell._id);
 
-  // Mettre à jour le robot pour le remettre en vente
-  robotToSell.owner = null;
-  robotToSell.isPlayerSale = true;
-  robotToSell.price = salePrice; // Le nouveau prix d'achat est le prix de revente calculé
-  robotToSell.stock = 1;
-  robotToSell.investedKevium = 0; // Réinitialiser l'investissement pour le prochain cycle
+    // ---- AJOUT À L'HISTORIQUE DES VENTES ----
+    user.salesHistory.push({
+      robotName: robotToSell.name,
+      salePrice: salePrice,
+      userRevenue: userTotalReturn,
+      saleDate: new Date(),
+    });
+    // -----------------------------------------
 
-  await robotToSell.save();
-  await user.save();
-  await superAdmin.save();
+    robotToSell.owner = null;
+    robotToSell.isPlayerSale = true;
+    robotToSell.price = salePrice;
+    robotToSell.stock = 1;
+    robotToSell.investedKevium = 0;
 
-  res.status(200).json({
-    message: `Robot ${robotToSell.name} vendu pour ${salePrice} KVM. Vous recevez ${userTotalReturn} KVM.`,
-    user: user,
-  });
+    await robotToSell.save();
+    await user.save();
+    await superAdmin.save();
+
+    res.status(200).json({
+      message: `Robot ${robotToSell.name} vendu pour ${salePrice} KVM. Vous recevez ${userTotalReturn} KVM.`,
+      user: user,
+    });
 });
 
 // @desc    Upgrade a robot owned by the user
@@ -127,7 +133,6 @@ const upgradeRobot = asyncHandler(async (req, res) => {
   const costOfUpgrade = robotToUpgrade.upgradeCost;
   user.keviumBalance -= costOfUpgrade;
 
-  // On ajoute le coût de l'amélioration à l'investissement total
   robotToUpgrade.investedKevium += costOfUpgrade;
   robotToUpgrade.level += 1;
   robotToUpgrade.miningPower = parseFloat((robotToUpgrade.miningPower * robotToUpgrade.levelUpFactor).toFixed(2));

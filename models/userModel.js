@@ -48,11 +48,11 @@ const userSchema = mongoose.Schema(
       required: true,
       default: 500,
     },
-    unclaimedKevium: { // KVM minés mais non réclamés
+    unclaimedKevium: {
       type: Number,
       default: 0,
     },
-    lastKvmUpdate: { // Date du dernier calcul de minage
+    lastKvmUpdate: {
       type: Date,
       default: Date.now,
     },
@@ -64,13 +64,21 @@ const userSchema = mongoose.Schema(
     ],
     purchaseHistory: [
       {
-        robotId: { type: mongoose.Schema.Types.ObjectId, ref: 'Robot' },
         robotName: { type: String },
         price: { type: Number },
         purchaseDate: { type: Date, default: Date.now },
       },
     ],
-    // ---- END GAMEPLAY FIELDS ----
+    // ---- NOUVEAU CHAMP POUR L'HISTORIQUE DES VENTES ----
+    salesHistory: [
+      {
+        robotName: { type: String },
+        salePrice: { type: Number }, // Prix auquel le robot a été vendu
+        userRevenue: { type: Number }, // Montant net reçu par le joueur
+        saleDate: { type: Date, default: Date.now },
+      }
+    ],
+    // --------------------------------------------------
     resetPasswordToken: String,
     resetPasswordExpire: Date,
     loginAttempts: {
