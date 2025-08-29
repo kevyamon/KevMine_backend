@@ -12,7 +12,7 @@ import {
   updateUser,
   updateUserStatus,
   unlockUser,
-  triggerRankUpdate, // 1. Importer la fonction
+  triggerRankUpdate,
 } from '../controllers/adminController.js';
 import {
   getSettings,
@@ -21,27 +21,25 @@ import {
 
 const router = express.Router();
 
-// ---- ROUTES PUBLIQUES POUR LES CONNECTÉS ----
+// --- CORRECTION : Routes réorganisées pour une meilleure lisibilité et sécurité ---
+
+// Route accessible à tout utilisateur connecté
 router.route('/settings').get(protect, getSettings);
 
-// ---- ROUTES SUPER ADMIN ----
+// Routes nécessitant les droits de Super Administrateur
 router.route('/settings').put(protect, superAdminProtect, updateSettings);
-// 2. Nouvelle route pour déclencher la mise à jour du classement
 router.route('/trigger-rank-update').post(protect, superAdminProtect, triggerRankUpdate);
+router.route('/users/:id/status').put(protect, superAdminProtect, updateUserStatus);
 
-
-// ---- ROUTES ADMIN ----
-router.use(adminProtect);
-
-router.route('/users').get(getUsers); // Renommé pour plus de clarté
-router.route('/users/locked').get(getLockedUsers); // Renommé pour plus de clarté
-router.route('/users/:id/unlock').put(unlockUser);
+// Routes nécessitant les droits d'Administrateur
+// On applique ici la double protection : d'abord identifier (protect), puis autoriser (adminProtect)
+router.route('/users').get(protect, adminProtect, getUsers);
+router.route('/users/locked').get(protect, adminProtect, getLockedUsers);
+router.route('/users/:id/unlock').put(protect, adminProtect, unlockUser);
 router
   .route('/users/:id')
-  .get(getUserById)
-  .put(updateUser)
-  .delete(deleteUser);
-
-router.route('/users/:id/status').put(superAdminProtect, updateUserStatus);
+  .get(protect, adminProtect, getUserById)
+  .put(protect, adminProtect, updateUser)
+  .delete(protect, adminProtect, deleteUser);
 
 export default router;
