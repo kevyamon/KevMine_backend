@@ -1,6 +1,6 @@
 import asyncHandler from 'express-async-handler';
 import User from '../models/userModel.js';
-import { updateQuestProgress } from '../utils/questService.js'; // 1. Importer le service de quêtes
+import { updateQuestProgress } from '../utils/questService.js';
 
 // @desc    Update user's unclaimed Kevium based on mining power and time
 // @route   GET /api/game/status
@@ -43,8 +43,6 @@ const claimKevium = asyncHandler(async (req, res) => {
   user.lastKvmUpdate = now;
   const updatedUser = await user.save();
   
-  // 2. Mettre à jour la progression de la quête après avoir réclamé
-  // On passe le montant exact pour les quêtes de type 'récolter X KVM'
   await updateQuestProgress(req.user._id, 'CLAIM_KVM', amountToClaim);
   
   res.json({ message: `${amountToClaim.toFixed(2)} KVM réclamés avec succès !`, keviumBalance: updatedUser.keviumBalance, unclaimedKevium: updatedUser.unclaimedKevium });
@@ -55,21 +53,20 @@ const claimKevium = asyncHandler(async (req, res) => {
 // @access  Public
 const getLeaderboard = asyncHandler(async (req, res) => {
   const { searchTerm } = req.query;
-  let query = { isAdmin: false };
+  // CORRECTION : On ne prend que les joueurs classés (rang > 0)
+  let query = { isAdmin: false, rank: { $gt: 0 } };
 
   if (searchTerm) {
     const isNumeric = /^\d+$/.test(searchTerm);
     if (isNumeric) {
-      // Recherche par rang
       query.rank = parseInt(searchTerm, 10);
     } else {
-      // Recherche par nom (insensible à la casse)
       query.name = { $regex: searchTerm, $options: 'i' };
     }
   }
 
   const leaderboard = await User.find(query)
-    .sort({ rank: 1 }) // Trier par rang
+    .sort({ rank: 1 })
     .limit(100)
     .select('name keviumBalance rank previousRank');
 
