@@ -28,6 +28,11 @@ const updateSettings = asyncHandler(async (req, res) => {
     { new: true, upsert: true } // new: true pour retourner le doc mis à jour, upsert: true pour le créer s'il n'existe pas
   );
 
+  // CORRECTION : Émettre un événement à tous les clients
+  if (req.io) {
+    req.io.emit('settings_updated', { newRate: settings.salesCommissionRate });
+  }
+
   res.json(settings);
 });
 
