@@ -49,26 +49,36 @@ const updateCategory = asyncHandler(async (req, res) => {
 });
 
 
-// @desc    Delete a category
+// @desc    Delete a category AND all its robots
 // @route   DELETE /api/categories/:id
 // @access  Private/Admin
 const deleteCategory = asyncHandler(async (req, res) => {
+  const { confirmationCode } = req.body;
   const category = await Category.findById(req.params.id);
 
-  if (category) {
-    // Optional: Check if any robot is using this category before deleting
-    const robotsInCategory = await Robot.countDocuments({ category: req.params.id });
-    if (robotsInCategory > 0) {
-      res.status(400);
-      throw new Error('Impossible de supprimer, des robots utilisent cette catégorie.');
-    }
-    
-    await Category.deleteOne({ _id: category._id });
-    res.json({ message: 'Catégorie supprimée' });
-  } else {
+  if (!category) {
     res.status(404);
     throw new Error('Catégorie non trouvée');
   }
+
+  // 1. Vérifier le code de confirmation
+  if (confirmationCode !== process.env.CATEGORIE_DELETE_CODE) {
+    res.status(401);
+    throw new Error('Code de confirmation invalide.');
+  }
+
+  // 2. Supprimer tous les robots de cette catégorie
+  await Robot.deleteMany({ category: req.params.id });
+
+  // 3. Supprimer la catégorie elle-même
+  await Category.deleteOne({ _id: category._id });
+  
+  // 4. Émettre des événements pour mettre à jour les clients en temps réel
+  if (req.io) {
+    req.io.emit('robots_updated'); // Rafraîchit le store
+  }
+
+  res.json({ message: 'Catégorie et tous les robots associés ont été supprimés.' });
 });
 
 export { getCategories, createCategory, updateCategory, deleteCategory };
