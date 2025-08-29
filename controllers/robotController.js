@@ -6,26 +6,19 @@ import sendEmail from '../utils/emailService.js';
 import { getPurchaseConfirmationTemplate } from '../utils/emailTemplates.js';
 import { updateQuestProgress } from '../utils/questService.js';
 
-// @desc    Get all robots for the store
-// @route   GET /api/robots
-// @access  Public
+// ... (les fonctions getRobots, getRobotById, purchaseRobot, sellRobot, upgradeRobot restent inchangées)
+
 const getRobots = asyncHandler(async (req, res) => {
   const robots = await Robot.find({ owner: null }).populate('category');
   res.json(robots);
 });
 
-// @desc    Get a single robot by ID
-// @route   GET /api/robots/:id
-// @access  Public
 const getRobotById = asyncHandler(async (req, res) => {
   const robot = await Robot.findById(req.params.id).populate('category');
   if (robot) res.json(robot);
   else { res.status(404); throw new Error('Robot non trouvé'); }
 });
 
-// @desc    Purchase a robot
-// @route   POST /api/robots/:id/purchase
-// @access  Private
 const purchaseRobot = asyncHandler(async (req, res) => {
   const robotToPurchase = await Robot.findById(req.params.id);
   const user = await User.findById(req.user._id);
@@ -74,9 +67,6 @@ const purchaseRobot = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Achat réussi !', user: updatedUser });
 });
 
-// @desc    Sell a robot owned by the user
-// @route   POST /api/robots/:id/sell
-// @access  Private
 const sellRobot = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
     const robotToSell = await Robot.findById(req.params.id);
@@ -109,13 +99,15 @@ const sellRobot = asyncHandler(async (req, res) => {
     robotToSell.price = salePrice;
     robotToSell.stock = 1;
     robotToSell.investedKevium = 0;
-    robotToSell.isSponsored = false; // <-- LA CORRECTION EST ICI
 
     await robotToSell.save();
     await user.save();
     await superAdmin.save();
     
     await updateQuestProgress(req.user._id, 'SELL_ROBOT', 1);
+    
+    // Émettre un événement pour rafraîchir le marché pour tous
+    req.io.emit('robots_updated');
 
     res.status(200).json({
       message: `Robot ${robotToSell.name} vendu pour ${salePrice} KVM. Vous recevez ${userTotalReturn} KVM.`,
@@ -123,9 +115,6 @@ const sellRobot = asyncHandler(async (req, res) => {
     });
 });
 
-// @desc    Upgrade a robot owned by the user
-// @route   PUT /api/robots/:id/upgrade
-// @access  Private
 const upgradeRobot = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
   const robotToUpgrade = await Robot.findById(req.params.id);
@@ -155,6 +144,10 @@ const createRobot = asyncHandler(async (req, res) => {
   const { name, icon, price, miningPower, rarity, stock, isSponsored, levelUpFactor, upgradeCost, category } = req.body;
   const robot = new Robot({ name, icon, price, miningPower, rarity, stock, isSponsored, levelUpFactor, upgradeCost, category });
   const createdRobot = await robot.save();
+  
+  // Émettre un événement pour rafraîchir le marché pour tous
+  req.io.emit('robots_updated');
+  
   res.status(201).json(createdRobot);
 });
 
@@ -163,6 +156,10 @@ const updateRobot = asyncHandler(async (req, res) => {
   if (robot) {
     Object.assign(robot, req.body);
     const updatedRobot = await robot.save();
+    
+    // CORRECTION : Émettre un événement pour rafraîchir le marché pour tous
+    req.io.emit('robots_updated');
+    
     res.json(updatedRobot);
   } else { res.status(404); throw new Error('Robot non trouvé'); }
 });
@@ -171,6 +168,10 @@ const deleteRobot = asyncHandler(async (req, res) => {
   const robot = await Robot.findById(req.params.id);
   if (robot) {
     await Robot.deleteOne({ _id: robot._id });
+    
+    // CORRECTION : Émettre un événement pour rafraîchir le marché pour tous
+    req.io.emit('robots_updated');
+    
     res.json({ message: 'Robot supprimé' });
   } else { res.status(404); throw new Error('Robot non trouvé'); }
 });
