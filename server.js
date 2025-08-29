@@ -10,7 +10,7 @@ import gameRoutes from './routes/gameRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import questRoutes from './routes/questRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
-import uploadRoutes from './routes/uploadRoutes.js'; // 1. Importer
+import uploadRoutes from './routes/uploadRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import cors from 'cors';
 import http from 'http';
@@ -26,12 +26,29 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Configure CORS for production
+// --- DÉBUT DE LA CORRECTION ---
+
+// 1. Définir une liste blanche des origines autorisées
+const allowedOrigins = [
+  process.env.FRONTEND_URL, // Ton URL de production
+  'http://localhost:5173',  // Ton URL de développement local
+];
+
+// 2. Mettre à jour les options CORS pour Express
 const corsOptions = {
-  origin: process.env.FRONTEND_URL,
+  origin: function (origin, callback) {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 };
+
 app.use(cors(corsOptions));
+
+// --- FIN DE LA CORRECTION ---
 
 // Body parser middleware
 app.use(express.json());
@@ -40,11 +57,11 @@ app.use(express.urlencoded({ extended: true }));
 // Cookie parser middleware
 app.use(cookieParser());
 
-// Socket.io configuration
+// 3. Mettre à jour la configuration CORS pour Socket.io
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL,
-    methods: ['GET', 'POST'],
+    origin: allowedOrigins, // Socket.io accepte directement un tableau
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
   },
 });
@@ -67,7 +84,7 @@ app.use('/api/game', gameRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/quests', questRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/uploads', uploadRoutes); // 2. Intégrer
+app.use('/api/uploads', uploadRoutes);
 
 // Ping endpoint to keep the server awake
 app.get('/ping', (req, res) => {
