@@ -26,15 +26,11 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// --- DÉBUT DE LA CORRECTION ---
-
-// 1. Définir une liste blanche des origines autorisées
 const allowedOrigins = [
-  process.env.FRONTEND_URL, // Ton URL de production
-  'http://localhost:5173',  // Ton URL de développement local
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
 ];
 
-// 2. Mettre à jour les options CORS pour Express
 const corsOptions = {
   origin: function (origin, callback) {
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
@@ -45,37 +41,28 @@ const corsOptions = {
   },
   credentials: true,
 };
-
 app.use(cors(corsOptions));
 
-// --- FIN DE LA CORRECTION ---
-
-// Body parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Cookie parser middleware
 app.use(cookieParser());
 
-// 3. Mettre à jour la configuration CORS pour Socket.io
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins, // Socket.io accepte directement un tableau
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
   },
 });
 
-// Pass the socket.io instance to the request object
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
 
-// Socket.io handler
 socketHandler(io);
 
-// API routes
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/robots', robotRoutes);
@@ -86,12 +73,10 @@ app.use('/api/quests', questRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/uploads', uploadRoutes);
 
-// Ping endpoint to keep the server awake
 app.get('/ping', (req, res) => {
   res.status(200).send('Pong');
 });
 
-// Deployment logic
 const __dirname = path.resolve();
 
 if (process.env.NODE_ENV === 'production') {
@@ -105,7 +90,6 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Custom error handlers
 app.use(notFound);
 app.use(errorHandler);
 
@@ -113,5 +97,6 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  startRankUpdateScheduler();
+  // CORRECTION : On passe 'io' au scheduler pour qu'il puisse notifier les clients
+  startRankUpdateScheduler(io);
 });
