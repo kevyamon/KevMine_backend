@@ -5,57 +5,87 @@ import generateTokens from '../utils/generateToken.js';
 import sendEmail from '../utils/emailService.js';
 import { getStatusChangeTemplate } from '../utils/emailTemplates.js';
 import { updatePlayerRanks } from '../utils/scheduler.js';
-import { createNotification } from '../utils/notificationService.js'; // 1. Importer le service
+import { createNotification } from '../utils/notificationService.js';
 
+// --- MISE À JOUR MAJEURE DE LA FONCTION DE BONUS ---
+// @desc    Grant bonus KVM to one, many, or all users
+// @route   POST /api/admin/users/grant-bonus
+// @access  Private/SuperAdmin
 const grantBonusToUser = asyncHandler(async (req, res) => {
-  const { userId, amount, reason } = req.body;
+  const { userIds, amount, reason, grantToAll } = req.body;
   const adminId = req.user._id;
 
-  if (!userId || !amount || !reason) {
+  if (!amount || !reason) {
     res.status(400);
-    throw new Error('Veuillez fournir un utilisateur, un montant et un motif.');
+    throw new Error('Veuillez fournir un montant et un motif.');
   }
 
-  const user = await User.findById(userId);
-  if (!user) {
+  const numericAmount = Number(amount);
+  if (isNaN(numericAmount) || numericAmount <= 0) {
+    res.status(400);
+    throw new Error('Le montant doit être un nombre positif.');
+  }
+
+  let targetUsers = [];
+  if (grantToAll) {
+    // Sélectionner tous les joueurs (non-admins)
+    targetUsers = await User.find({ isAdmin: false }, '_id name');
+  } else if (userIds && userIds.length > 0) {
+    // Sélectionner les joueurs spécifiés
+    targetUsers = await User.find({ _id: { $in: userIds } }, '_id name');
+  } else {
+    res.status(400);
+    throw new Error('Veuillez sélectionner au moins un utilisateur ou cocher "tous les joueurs".');
+  }
+
+  if (targetUsers.length === 0) {
     res.status(404);
-    throw new Error('Utilisateur non trouvé.');
+    throw new Error('Aucun utilisateur cible trouvé.');
   }
 
-  user.keviumBalance += Number(amount);
-  await user.save();
+  const userIdsToUpdate = targetUsers.map(u => u._id);
+
+  // Mettre à jour le solde de tous les utilisateurs ciblés en une seule requête
+  await User.updateMany(
+    { _id: { $in: userIdsToUpdate } },
+    { $inc: { keviumBalance: numericAmount } }
+  );
+
+  // Créer les notifications et envoyer les événements sockets
+  const notificationMessage = `Vous avez reçu un bonus de ${numericAmount} KVM ! Motif : ${reason}`;
+  for (const user of targetUsers) {
+    // 1. Créer la notification dans la base de données (et émettre l'événement pour la cloche)
+    await createNotification(req.io, user._id, notificationMessage, 'bonus');
+    
+    // 2. Émettre l'événement pour afficher la modale pop-up
+    const updatedUser = await User.findById(user._id, 'keviumBalance');
+    const socketId = req.io.getSocketIdByUserId(user._id.toString());
+    if (socketId) {
+      req.io.to(socketId).emit('bonus_granted', {
+        amount: numericAmount,
+        reason,
+        keviumBalance: updatedUser.keviumBalance,
+      });
+    }
+  }
+
+  // Journaliser l'action de l'admin
+  const logDescription = grantToAll
+    ? `Bonus de ${numericAmount} KVM accordé à TOUS les joueurs. Raison: ${reason}`
+    : `Bonus de ${numericAmount} KVM accordé à ${targetUsers.length} joueur(s). Raison: ${reason}`;
 
   await Log.create({
     user: adminId,
     action: 'bonus_granted',
-    description: `Bonus de ${amount} KVM accordé à ${user.name} (Raison: ${reason})`,
+    description: logDescription,
     ip: req.ip,
   });
 
-  const socketId = req.io.getSocketIdByUserId(user._id.toString());
-  if (socketId) {
-    req.io.to(socketId).emit('bonus_granted', {
-      amount,
-      reason,
-      keviumBalance: user.keviumBalance,
-    });
-  }
-
-  // 2. Créer une notification pour le bonus
-  await createNotification(
-    req.io,
-    userId,
-    `Vous avez reçu un bonus de ${amount} KVM ! Motif : ${reason}`,
-    'bonus'
-  );
-
-  res.status(200).json({
-    message: `Bonus de ${amount} KVM accordé à ${user.name} avec succès.`,
-    user,
-  });
+  res.status(200).json({ message: logDescription });
 });
 
-// ... (Le reste du fichier reste identique)
+// ... (le reste du fichier reste inchangé)
+
 const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
 
