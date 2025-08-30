@@ -5,12 +5,22 @@ const logSchema = mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: false, // Could be a public action without a logged-in user
+      required: false,
     },
     action: {
       type: String,
       required: true,
-      enum: ['login_success', 'login_fail', 'password_reset', 'user_banned', 'user_unbanned', 'admin_promotion'],
+      // CORRECTION : Ajout des nouveaux statuts possibles
+      enum: [
+        'login_success', 
+        'login_fail', 
+        'password_reset', 
+        'user_banned', 
+        'user_unbanned', // Gardé pour rétrocompatibilité potentielle
+        'admin_promotion',
+        'user_suspended',
+        'user_active'
+      ],
     },
     description: {
       type: String,
