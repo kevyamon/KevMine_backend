@@ -5,7 +5,7 @@ const robotSchema = mongoose.Schema(
     name: {
       type: String,
       required: true,
-      trim: true, // Ajout pour enlever les espaces inutiles
+      trim: true,
     },
     icon: {
       type: String,
@@ -47,7 +47,6 @@ const robotSchema = mongoose.Schema(
       ref: 'User',
       required: false,
     },
-    // NOUVEAU : Ajout du champ pour identifier le vendeur
     seller: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -79,9 +78,9 @@ const robotSchema = mongoose.Schema(
   }
 );
 
-// CORRECTION : Création d'un index partiel.
-// Le nom du robot est unique UNIQUEMENT pour les robots de la boutique (ceux sans propriétaire).
-robotSchema.index({ name: 1 }, { unique: true, partialFilterExpression: { owner: null } });
+// CORRECTION : L'index partiel est maintenant plus spécifique.
+// Le nom du robot est unique UNIQUEMENT s'il n'a pas de propriétaire ET que ce n'est pas une revente de joueur.
+robotSchema.index({ name: 1 }, { unique: true, partialFilterExpression: { owner: null, isPlayerSale: false } });
 
 const Robot = mongoose.model('Robot', robotSchema);
 
