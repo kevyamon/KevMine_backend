@@ -6,79 +6,79 @@ import sendEmail from '../utils/emailService.js';
 import { getStatusChangeTemplate } from '../utils/emailTemplates.js';
 import { updatePlayerRanks } from '../utils/scheduler.js';
 
-// ... (getUsers, triggerRankUpdate, et les autres fonctions restent inchangées)
+// ... (getUsers, triggerRankUpdate, etc. ne changent pas)
 
-const updateUserStatus = asyncHandler(async (req, res) => {
-  const { status } = req.body;
-  const { id } = req.params;
+const updateUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
 
-  const user = await User.findById(id);
+  if (user) {
+    const originalStatus = user.status;
+    const originalIsAdmin = user.isAdmin;
 
-  if (!user) {
+    user.name = req.body.name || user.name;
+    user.email = req.body.email || user.email;
+    user.isAdmin = req.body.isAdmin;
+    user.status = req.body.status || user.status;
+
+    const updatedUser = await user.save();
+
+    // --- DÉBUT DE LA CORRECTION ---
+    // Si le statut a été modifié, on envoie un événement temps réel à l'utilisateur concerné
+    if (updatedUser.status !== originalStatus) {
+      const socketId = req.io.getSocketIdByUserId(updatedUser._id.toString());
+      if (socketId) {
+        req.io.to(socketId).emit('status_update', {
+          status: updatedUser.status,
+        });
+      }
+      
+      const emailContent = getStatusChangeTemplate(updatedUser.name, updatedUser.status, `Votre compte a été mis à jour par l'administration. Nouveau statut : ${updatedUser.status}.`);
+      await sendEmail({
+        email: updatedUser.email,
+        subject: `Mise à jour de statut de votre compte KevMine`,
+        htmlContent: emailContent
+      });
+
+      await Log.create({
+        user: updatedUser._id,
+        action: `user_${updatedUser.status}`,
+        description: `Statut de l'utilisateur ${updatedUser.email} mis à jour par l'admin. Nouveau statut: ${updatedUser.status}`,
+        ip: req.ip,
+      });
+    }
+    // --- FIN DE LA CORRECTION ---
+
+    if (updatedUser.isAdmin !== originalIsAdmin && updatedUser.isAdmin) {
+      const emailContent = getStatusChangeTemplate(updatedUser.name, 'promoted_to_admin', `Félicitations ! Vous avez été promu au statut d'administrateur sur KevMine.`);
+      await sendEmail({
+        email: updatedUser.email,
+        subject: `Félicitations ! Promotion au statut d'administrateur`,
+        htmlContent: emailContent
+      });
+
+      await Log.create({
+        user: updatedUser._id,
+        action: 'admin_promotion',
+        description: `L'utilisateur ${updatedUser.email} a été promu administrateur par l'admin.`,
+        ip: req.ip,
+      });
+    }
+
+    res.json({
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      isAdmin: updatedUser.isAdmin,
+      status: updatedUser.status,
+    });
+  } else {
     res.status(404);
-    throw new Error('Utilisateur non trouvé');
+    throw new Error('User not found');
   }
-
-  if (user.email === process.env.SUPER_ADMIN_EMAIL) {
-    res.status(403);
-    throw new Error('Vous ne pouvez pas modifier le statut du Super Administrateur');
-  }
-
-  const originalStatus = user.status;
-  user.status = status;
-  await user.save();
-
-  // CORRECTION : On génère de nouveaux tokens pour l'utilisateur
-  // Cela invalide les anciens et force une mise à jour de l'état côté client
-  await generateTokens(res, user._id);
-
-  // --- NOUVEAU : Logique Socket.io ---
-  // 1. Trouver la socket de l'utilisateur cible
-  const socketId = req.io.getSocketIdByUserId(user._id.toString());
-  if (socketId) {
-    // 2. Envoyer l'événement de mise à jour de statut directement à cet utilisateur
-    req.io.to(socketId).emit('status_update', {
-      status: user.status,
-    });
-  }
-  
-  // 3. Notifier tous les admins connectés du changement
-  req.io.to(req.io.getAdminSockets()).emit('user_status_change', {
-    userId: user._id,
-    name: user.name,
-    email: user.email,
-    newStatus: user.status,
-    timestamp: new Date(),
-  });
-
-  if (user.status !== originalStatus) {
-    const emailContent = getStatusChangeTemplate(user.name, user.status, `Votre statut de compte a été mis à jour par un administrateur. Nouveau statut : ${user.status}.`);
-    await sendEmail({
-      email: user.email,
-      subject: `Mise à jour de statut de votre compte KevMine`,
-      htmlContent: emailContent
-    });
-
-    await Log.create({
-      user: user._id,
-      action: `user_${user.status}`,
-      description: `Statut de l'utilisateur ${user.email} mis à jour par le super admin. Nouveau statut: ${user.status}`,
-      ip: req.ip,
-    });
-  }
-
-  res.status(200).json({
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    isAdmin: user.isAdmin,
-    isSuperAdmin: user.isSuperAdmin,
-    status: user.status,
-  });
 });
 
-// ... (le reste du fichier reste inchangé)
 
+// ... (le reste du fichier updateUserStatus, deleteUser, etc. reste inchangé)
 const getUsers = asyncHandler(async (req, res) => {
   const users = await User.find({});
   res.json(users);
@@ -126,63 +126,67 @@ const getUserById = asyncHandler(async (req, res) => {
   }
 });
 
-const updateUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
+const updateUserStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  const { id } = req.params;
 
-  if (user) {
-    const originalStatus = user.status;
-    const originalIsAdmin = user.isAdmin;
+  const user = await User.findById(id);
 
-    user.name = req.body.name || user.name;
-    user.email = req.body.email || user.email;
-    user.isAdmin = req.body.isAdmin;
-    user.status = req.body.status || user.status;
-
-    const updatedUser = await user.save();
-
-    if (updatedUser.status !== originalStatus) {
-      const emailContent = getStatusChangeTemplate(updatedUser.name, updatedUser.status, `Votre compte a été mis à jour par l'administration. Nouveau statut : ${updatedUser.status}.`);
-      await sendEmail({
-        email: updatedUser.email,
-        subject: `Mise à jour de statut de votre compte KevMine`,
-        htmlContent: emailContent
-      });
-
-      await Log.create({
-        user: updatedUser._id,
-        action: `user_${updatedUser.status}`,
-        description: `Statut de l'utilisateur ${updatedUser.email} mis à jour par l'admin. Nouveau statut: ${updatedUser.status}`,
-        ip: req.ip,
-      });
-    }
-
-    if (updatedUser.isAdmin !== originalIsAdmin && updatedUser.isAdmin) {
-      const emailContent = getStatusChangeTemplate(updatedUser.name, 'promoted_to_admin', `Félicitations ! Vous avez été promu au statut d'administrateur sur KevMine.`);
-      await sendEmail({
-        email: updatedUser.email,
-        subject: `Félicitations ! Promotion au statut d'administrateur`,
-        htmlContent: emailContent
-      });
-
-      await Log.create({
-        user: updatedUser._id,
-        action: 'admin_promotion',
-        description: `L'utilisateur ${updatedUser.email} a été promu administrateur par l'admin.`,
-        ip: req.ip,
-      });
-    }
-
-    res.json({
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      isAdmin: updatedUser.isAdmin,
-      status: updatedUser.status,
-    });
-  } else {
+  if (!user) {
     res.status(404);
-    throw new Error('User not found');
+    throw new Error('Utilisateur non trouvé');
   }
+
+  if (user.email === process.env.SUPER_ADMIN_EMAIL) {
+    res.status(403);
+    throw new Error('Vous ne pouvez pas modifier le statut du Super Administrateur');
+  }
+
+  const originalStatus = user.status;
+  user.status = status;
+  await user.save();
+
+  await generateTokens(res, user._id);
+
+  const socketId = req.io.getSocketIdByUserId(user._id.toString());
+  if (socketId) {
+    req.io.to(socketId).emit('status_update', {
+      status: user.status,
+    });
+  }
+  
+  req.io.to(req.io.getAdminSockets()).emit('user_status_change', {
+    userId: user._id,
+    name: user.name,
+    email: user.email,
+    newStatus: user.status,
+    timestamp: new Date(),
+  });
+
+  if (user.status !== originalStatus) {
+    const emailContent = getStatusChangeTemplate(user.name, user.status, `Votre statut de compte a été mis à jour par un administrateur. Nouveau statut : ${user.status}.`);
+    await sendEmail({
+      email: user.email,
+      subject: `Mise à jour de statut de votre compte KevMine`,
+      htmlContent: emailContent
+    });
+
+    await Log.create({
+      user: user._id,
+      action: `user_${user.status}`,
+      description: `Statut de l'utilisateur ${user.email} mis à jour par le super admin. Nouveau statut: ${user.status}`,
+      ip: req.ip,
+    });
+  }
+
+  res.status(200).json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    isAdmin: user.isAdmin,
+    isSuperAdmin: user.isSuperAdmin,
+    status: user.status,
+  });
 });
 
 const unlockUser = asyncHandler(async (req, res) => {
@@ -216,7 +220,6 @@ const unlockUser = asyncHandler(async (req, res) => {
         throw new Error('Ce compte n\'est pas verrouillé.');
     }
 });
-
 
 export {
   getUsers,
