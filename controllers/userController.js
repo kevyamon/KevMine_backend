@@ -14,11 +14,13 @@ const authUser = asyncHandler(async (req, res) => {
     $or: [{ email: identifier }, { name: identifier }, { phone: identifier }],
   });
 
-  if (!user) {
+  if (!user || !(await user.matchPassword(password))) {
+    if (user) {
+      await user.incLoginAttempts();
+    }
     await Log.create({
       action: 'login_fail',
-      description: `Tentative de connexion échouée pour l'identifiant: ${identifier}`,
-      email: identifier,
+      description: `Tentative de connexion échouée pour: ${identifier}`,
       ip: req.ip,
     });
     res.status(401);
@@ -29,64 +31,49 @@ const authUser = asyncHandler(async (req, res) => {
     res.status(429);
     throw new Error('Trop de tentatives de connexion échouées. Veuillez réessayer dans 10 minutes.');
   }
-
-  if (await user.matchPassword(password)) {
-    // CORRECTION : Messages de notification adaptés
-    if (user.status === 'banned') {
-      res.status(403);
-      throw new Error('Votre compte est banni.');
-    }
-    if (user.status === 'suspended') {
-      res.status(403);
-      throw new Error('Votre compte est temporairement suspendu.');
-    }
+  
+  // --- DÉBUT DE LA CORRECTION ---
+  // Si l'utilisateur est banni ou suspendu, on renvoie une erreur 403
+  // MAIS on inclut ses informations pour que le frontend puisse le rediriger.
+  if (user.status === 'banned' || user.status === 'suspended') {
+    const message = `Votre compte est ${user.status === 'banned' ? 'banni' : 'temporairement suspendu'}.`;
     
-    await Log.create({
-      user: user._id,
-      action: 'login_success',
-      description: `Connexion réussie pour l'utilisateur: ${user.email}`,
-      ip: req.ip,
-    });
-
-    const isNewUser = false;
-    await generateTokens(res, user._id);
-    await user.resetLoginAttempts();
-
+    // On ne génère pas de token, mais on fournit les infos utilisateur
     const userData = user.toObject();
     delete userData.password;
 
-    res.status(200).json({ ...userData, isNewUser });
-    
-    req.io.to(req.io.getAdminSockets()).emit('user_login', {
-      userId: user._id,
-      name: user.name,
-      email: user.email,
-      timestamp: new Date(),
+    return res.status(403).json({
+      message,
+      userInfo: userData // Fournit les détails de l'utilisateur banni
     });
-  } else {
-    await user.incLoginAttempts();
-    await Log.create({
-      action: 'login_fail',
-      description: `Mot de passe incorrect pour l'utilisateur: ${user.email}`,
-      user: user._id,
-      ip: req.ip,
-    });
-    
-    if (user.isLocked) {
-      req.io.to(req.io.getAdminSockets()).emit('user_locked', {
-        userId: user._id,
-        name: user.name,
-        email: user.email,
-        timestamp: new Date(),
-      });
-    }
-
-    res.status(401);
-    throw new Error('Identifiant ou mot de passe invalide');
   }
+  // --- FIN DE LA CORRECTION ---
+
+  await Log.create({
+    user: user._id,
+    action: 'login_success',
+    description: `Connexion réussie pour l'utilisateur: ${user.email}`,
+    ip: req.ip,
+  });
+
+  const isNewUser = false;
+  await generateTokens(res, user._id);
+  await user.resetLoginAttempts();
+
+  const userData = user.toObject();
+  delete userData.password;
+
+  res.status(200).json({ ...userData, isNewUser });
+    
+  req.io.to(req.io.getAdminSockets()).emit('user_login', {
+    userId: user._id,
+    name: user.name,
+    email: user.email,
+    timestamp: new Date(),
+  });
 });
 
-// ... (Le reste des fonctions registerUser, refreshAccessToken, etc. reste inchangé)
+// ... (Le reste du fichier reste inchangé)
 
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password, phone } = req.body;
@@ -323,6 +310,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 
   res.status(200).json({ success: true, message: 'Mot de passe réinitialisé' });
 });
+
 
 export {
   authUser,
