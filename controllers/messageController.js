@@ -3,6 +3,31 @@ import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
 import User from '../models/userModel.js';
 
+// @desc    Find or create a conversation with another user
+// @route   POST /api/messages/conversations/findOrCreate
+// @access  Private
+const findOrCreateConversation = asyncHandler(async (req, res) => {
+  const { receiverId } = req.body;
+  const senderId = req.user._id;
+
+  if (!receiverId) {
+    res.status(400);
+    throw new Error('ID du destinataire manquant.');
+  }
+
+  let conversation = await Conversation.findOne({
+    participants: { $all: [senderId, receiverId] },
+  });
+
+  if (!conversation) {
+    conversation = await Conversation.create({
+      participants: [senderId, receiverId],
+    });
+  }
+
+  res.status(200).json(conversation);
+});
+
 // @desc    Send a message
 // @route   POST /api/messages/send/:receiverId
 // @access  Private
@@ -79,4 +104,4 @@ const getConversations = asyncHandler(async (req, res) => {
   res.status(200).json(conversations);
 });
 
-export { sendMessage, getMessages, getConversations };
+export { sendMessage, getMessages, getConversations, findOrCreateConversation };
