@@ -39,7 +39,8 @@ const userSchema = mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'banned', 'inactive'],
+      // CORRECTION : "inactive" est remplacé par "suspended"
+      enum: ['active', 'banned', 'suspended'],
       default: 'active',
     },
     // ---- GAMEPLAY FIELDS ----

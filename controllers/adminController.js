@@ -4,22 +4,88 @@ import Log from '../models/logModel.js';
 import generateTokens from '../utils/generateToken.js';
 import sendEmail from '../utils/emailService.js';
 import { getStatusChangeTemplate } from '../utils/emailTemplates.js';
-import { updatePlayerRanks } from '../utils/scheduler.js'; // 1. Importer la fonction de mise à jour
+import { updatePlayerRanks } from '../utils/scheduler.js';
 
-// @desc    Get all users
-// @route   GET /api/admin/users
-// @access  Private/Admin
+// ... (getUsers, triggerRankUpdate, et les autres fonctions restent inchangées)
+
+const updateUserStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  const { id } = req.params;
+
+  const user = await User.findById(id);
+
+  if (!user) {
+    res.status(404);
+    throw new Error('Utilisateur non trouvé');
+  }
+
+  if (user.email === process.env.SUPER_ADMIN_EMAIL) {
+    res.status(403);
+    throw new Error('Vous ne pouvez pas modifier le statut du Super Administrateur');
+  }
+
+  const originalStatus = user.status;
+  user.status = status;
+  await user.save();
+
+  // CORRECTION : On génère de nouveaux tokens pour l'utilisateur
+  // Cela invalide les anciens et force une mise à jour de l'état côté client
+  await generateTokens(res, user._id);
+
+  // --- NOUVEAU : Logique Socket.io ---
+  // 1. Trouver la socket de l'utilisateur cible
+  const socketId = req.io.getSocketIdByUserId(user._id.toString());
+  if (socketId) {
+    // 2. Envoyer l'événement de mise à jour de statut directement à cet utilisateur
+    req.io.to(socketId).emit('status_update', {
+      status: user.status,
+    });
+  }
+  
+  // 3. Notifier tous les admins connectés du changement
+  req.io.to(req.io.getAdminSockets()).emit('user_status_change', {
+    userId: user._id,
+    name: user.name,
+    email: user.email,
+    newStatus: user.status,
+    timestamp: new Date(),
+  });
+
+  if (user.status !== originalStatus) {
+    const emailContent = getStatusChangeTemplate(user.name, user.status, `Votre statut de compte a été mis à jour par un administrateur. Nouveau statut : ${user.status}.`);
+    await sendEmail({
+      email: user.email,
+      subject: `Mise à jour de statut de votre compte KevMine`,
+      htmlContent: emailContent
+    });
+
+    await Log.create({
+      user: user._id,
+      action: `user_${user.status}`,
+      description: `Statut de l'utilisateur ${user.email} mis à jour par le super admin. Nouveau statut: ${user.status}`,
+      ip: req.ip,
+    });
+  }
+
+  res.status(200).json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    isAdmin: user.isAdmin,
+    isSuperAdmin: user.isSuperAdmin,
+    status: user.status,
+  });
+});
+
+// ... (le reste du fichier reste inchangé)
+
 const getUsers = asyncHandler(async (req, res) => {
   const users = await User.find({});
   res.json(users);
 });
 
-// @desc    Trigger a manual rank update
-// @route   POST /api/admin/trigger-rank-update
-// @access  Private/SuperAdmin
 const triggerRankUpdate = asyncHandler(async (req, res) => {
   try {
-    // 2. Appeler la fonction manuellement
     await updatePlayerRanks();
     res.status(200).json({ message: 'Mise à jour manuelle du classement terminée avec succès.' });
   } catch (error) {
@@ -28,19 +94,11 @@ const triggerRankUpdate = asyncHandler(async (req, res) => {
   }
 });
 
-
-// ... (le reste du fichier reste identique)
-// @desc    Get all locked users
-// @route   GET /api/admin/locked-users
-// @access  Private/Admin
 const getLockedUsers = asyncHandler(async (req, res) => {
   const lockedUsers = await User.find({ lockUntil: { $gt: Date.now() } });
   res.json(lockedUsers);
 });
 
-// @desc    Delete user
-// @route   DELETE /api/admin/users/:id
-// @access  Private/Admin
 const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
 
@@ -57,9 +115,6 @@ const deleteUser = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Get user by ID
-// @route   GET /api/admin/users/:id
-// @access  Private/Admin
 const getUserById = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id).select('-password');
 
@@ -71,9 +126,6 @@ const getUserById = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Update user
-// @route   PUT /api/admin/users/:id
-// @access  Private/Admin
 const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
 
@@ -133,75 +185,6 @@ const updateUser = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Update user status
-// @route   PUT /api/admin/users/:id/status
-// @access  Private/SuperAdmin
-const updateUserStatus = asyncHandler(async (req, res) => {
-  const { status } = req.body;
-  const { id } = req.params;
-
-  const user = await User.findById(id);
-
-  if (!user) {
-    res.status(404);
-    throw new Error('Utilisateur non trouvé');
-  }
-
-  if (user.email === process.env.SUPER_ADMIN_EMAIL) {
-    res.status(403);
-    throw new Error('Vous ne pouvez pas modifier le statut du Super Administrateur');
-  }
-
-  const originalStatus = user.status;
-
-  user.status = status;
-  await user.save();
-  await generateTokens(res, user._id);
-
-  const socketId = req.io.getSocketIdByUserId(user._id.toString());
-  if (socketId) {
-    req.io.to(socketId).emit('status_update', {
-      status: user.status,
-    });
-  }
-  
-  req.io.to(req.io.getAdminSockets()).emit('user_status_change', {
-    userId: user._id,
-    name: user.name,
-    email: user.email,
-    newStatus: user.status,
-    timestamp: new Date(),
-  });
-
-  if (user.status !== originalStatus) {
-    const emailContent = getStatusChangeTemplate(user.name, user.status, `Votre statut de compte a été mis à jour par un administrateur. Nouveau statut : ${user.status}.`);
-    await sendEmail({
-      email: user.email,
-      subject: `Mise à jour de statut de votre compte KevMine`,
-      htmlContent: emailContent
-    });
-
-    await Log.create({
-      user: user._id,
-      action: `user_${user.status}`,
-      description: `Statut de l'utilisateur ${user.email} mis à jour par le super admin. Nouveau statut: ${user.status}`,
-      ip: req.ip,
-    });
-  }
-
-  res.status(200).json({
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    isAdmin: user.isAdmin,
-    isSuperAdmin: user.isSuperAdmin,
-    status: user.status,
-  });
-});
-
-// @desc    Unlock a user account
-// @route   PUT /api/admin/users/:id/unlock
-// @access  Private/Admin
 const unlockUser = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id);
 
@@ -243,5 +226,5 @@ export {
   updateUser,
   updateUserStatus,
   unlockUser,
-  triggerRankUpdate, // 3. Exporter la nouvelle fonction
+  triggerRankUpdate,
 };

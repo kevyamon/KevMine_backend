@@ -7,11 +7,6 @@ import crypto from 'crypto';
 import RefreshToken from '../models/refreshTokenModel.js';
 import jwt from 'jsonwebtoken';
 
-// ... (les fonctions authUser, registerUser, refreshAccessToken, logoutUser restent les mêmes)
-
-// @desc    Auth user & get token
-// @route   POST /api/users/login
-// @access  Public
 const authUser = asyncHandler(async (req, res) => {
   const { identifier, password } = req.body;
 
@@ -36,13 +31,14 @@ const authUser = asyncHandler(async (req, res) => {
   }
 
   if (await user.matchPassword(password)) {
+    // CORRECTION : Messages de notification adaptés
     if (user.status === 'banned') {
-      res.status(401);
-      throw new Error('Votre compte est temporairement suspendu.');
+      res.status(403);
+      throw new Error('Votre compte est banni.');
     }
-    if (user.status === 'inactive') {
-      res.status(401);
-      throw new Error('Votre compte est inactif.');
+    if (user.status === 'suspended') {
+      res.status(403);
+      throw new Error('Votre compte est temporairement suspendu.');
     }
     
     await Log.create({
@@ -90,9 +86,8 @@ const authUser = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Register a new user
-// @route   POST /api/users
-// @access  Public
+// ... (Le reste des fonctions registerUser, refreshAccessToken, etc. reste inchangé)
+
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password, phone } = req.body;
 
@@ -139,9 +134,6 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Refresh access token using refresh token
-// @route   POST /api/users/refresh-token
-// @access  Public
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const refreshToken = req.cookies.refresh;
 
@@ -182,9 +174,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Logout user
-// @route   POST /api/users/logout
-// @access  Private
 const logoutUser = asyncHandler(async (req, res) => {
   res.cookie('jwt', '', {
     httpOnly: true,
@@ -201,9 +190,6 @@ const logoutUser = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Déconnexion réussie' });
 });
 
-// @desc    Get user profile
-// @route   GET /api/users/profile
-// @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).populate({
     path: 'inventory',
@@ -221,9 +207,6 @@ const getUserProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Update user profile (text data only)
-// @route   PUT /api/users/profile
-// @access  Private
 const updateUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
 
@@ -247,16 +230,12 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// --- NOUVELLE FONCTION POUR L'UPLOAD DE PHOTO ---
-// @desc    Update user profile photo
-// @route   PUT /api/users/profile/photo
-// @access  Private
 const updateUserProfilePhoto = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
 
   if (user) {
     if (req.file) {
-      user.photo = req.file.path; // L'URL sécurisée de Cloudinary
+      user.photo = req.file.path;
     } else {
       res.status(400);
       throw new Error("Aucun fichier n'a été téléversé.");
@@ -272,14 +251,7 @@ const updateUserProfilePhoto = asyncHandler(async (req, res) => {
     throw new Error('Utilisateur non trouvé');
   }
 });
-// ---------------------------------------------
 
-
-// ... (les fonctions forgotPassword et resetPassword restent les mêmes)
-
-// @desc    Forgot password
-// @route   POST /api/users/forgot-password
-// @access  Public
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -327,9 +299,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Reset password
-// @route   PUT /api/users/reset-password/:resetToken
-// @access  Public
 const resetPassword = asyncHandler(async (req, res) => {
   const resetPasswordToken = crypto
     .createHash('sha256')
@@ -364,5 +333,5 @@ export {
   forgotPassword,
   resetPassword,
   refreshAccessToken,
-  updateUserProfilePhoto, // Ne pas oublier d'exporter la nouvelle fonction
+  updateUserProfilePhoto,
 };
