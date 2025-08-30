@@ -11,6 +11,7 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import questRoutes from './routes/questRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js'; // 1. Importer la nouvelle route
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import cors from 'cors';
 import http from 'http';
@@ -72,6 +73,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/quests', questRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/notifications', notificationRoutes); // 2. Utiliser la nouvelle route
 
 app.get('/ping', (req, res) => {
   res.status(200).send('Pong');
@@ -97,6 +99,5 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  // CORRECTION : On passe 'io' au scheduler pour qu'il puisse notifier les clients
   startRankUpdateScheduler(io);
 });

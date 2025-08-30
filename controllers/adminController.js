@@ -5,11 +5,8 @@ import generateTokens from '../utils/generateToken.js';
 import sendEmail from '../utils/emailService.js';
 import { getStatusChangeTemplate } from '../utils/emailTemplates.js';
 import { updatePlayerRanks } from '../utils/scheduler.js';
+import { createNotification } from '../utils/notificationService.js'; // 1. Importer le service
 
-// --- NOUVELLE FONCTION POUR L'ATTRIBUTION DE BONUS ---
-// @desc    Grant bonus KVM to a user
-// @route   POST /api/admin/users/grant-bonus
-// @access  Private/SuperAdmin
 const grantBonusToUser = asyncHandler(async (req, res) => {
   const { userId, amount, reason } = req.body;
   const adminId = req.user._id;
@@ -28,7 +25,6 @@ const grantBonusToUser = asyncHandler(async (req, res) => {
   user.keviumBalance += Number(amount);
   await user.save();
 
-  // Log l'action de l'admin
   await Log.create({
     user: adminId,
     action: 'bonus_granted',
@@ -36,7 +32,6 @@ const grantBonusToUser = asyncHandler(async (req, res) => {
     ip: req.ip,
   });
 
-  // Envoyer une notification en temps réel à l'utilisateur ciblé
   const socketId = req.io.getSocketIdByUserId(user._id.toString());
   if (socketId) {
     req.io.to(socketId).emit('bonus_granted', {
@@ -46,15 +41,21 @@ const grantBonusToUser = asyncHandler(async (req, res) => {
     });
   }
 
+  // 2. Créer une notification pour le bonus
+  await createNotification(
+    req.io,
+    userId,
+    `Vous avez reçu un bonus de ${amount} KVM ! Motif : ${reason}`,
+    'bonus'
+  );
+
   res.status(200).json({
     message: `Bonus de ${amount} KVM accordé à ${user.name} avec succès.`,
     user,
   });
 });
 
-
-// ... (getUsers, triggerRankUpdate, etc. ne changent pas)
-
+// ... (Le reste du fichier reste identique)
 const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
 
@@ -69,8 +70,6 @@ const updateUser = asyncHandler(async (req, res) => {
 
     const updatedUser = await user.save();
 
-    // --- DÉBUT DE LA CORRECTION ---
-    // Si le statut a été modifié, on envoie un événement temps réel à l'utilisateur concerné
     if (updatedUser.status !== originalStatus) {
       const socketId = req.io.getSocketIdByUserId(updatedUser._id.toString());
       if (socketId) {
@@ -93,7 +92,6 @@ const updateUser = asyncHandler(async (req, res) => {
         ip: req.ip,
       });
     }
-    // --- FIN DE LA CORRECTION ---
 
     if (updatedUser.isAdmin !== originalIsAdmin && updatedUser.isAdmin) {
       const emailContent = getStatusChangeTemplate(updatedUser.name, 'promoted_to_admin', `Félicitations ! Vous avez été promu au statut d'administrateur sur KevMine.`);
@@ -124,8 +122,6 @@ const updateUser = asyncHandler(async (req, res) => {
   }
 });
 
-
-// ... (le reste du fichier updateUserStatus, deleteUser, etc. reste inchangé)
 const getUsers = asyncHandler(async (req, res) => {
   const users = await User.find({});
   res.json(users);
@@ -277,5 +273,5 @@ export {
   updateUserStatus,
   unlockUser,
   triggerRankUpdate,
-  grantBonusToUser, // Exporter la nouvelle fonction
+  grantBonusToUser,
 };
