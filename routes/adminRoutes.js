@@ -13,6 +13,7 @@ import {
   updateUserStatus,
   unlockUser,
   triggerRankUpdate,
+  grantBonusToUser, // 1. Importer la nouvelle fonction
 } from '../controllers/adminController.js';
 import {
   getSettings,
@@ -30,6 +31,7 @@ router.route('/settings').get(protect, getSettings);
 router.route('/settings').put(protect, superAdminProtect, updateSettings);
 router.route('/trigger-rank-update').post(protect, superAdminProtect, triggerRankUpdate);
 router.route('/users/:id/status').put(protect, superAdminProtect, updateUserStatus);
+router.route('/users/grant-bonus').post(protect, superAdminProtect, grantBonusToUser); // 2. Ajouter la nouvelle route
 
 // Routes nécessitant les droits d'Administrateur
 // On applique ici la double protection : d'abord identifier (protect), puis autoriser (adminProtect)

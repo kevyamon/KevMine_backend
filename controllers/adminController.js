@@ -6,6 +6,53 @@ import sendEmail from '../utils/emailService.js';
 import { getStatusChangeTemplate } from '../utils/emailTemplates.js';
 import { updatePlayerRanks } from '../utils/scheduler.js';
 
+// --- NOUVELLE FONCTION POUR L'ATTRIBUTION DE BONUS ---
+// @desc    Grant bonus KVM to a user
+// @route   POST /api/admin/users/grant-bonus
+// @access  Private/SuperAdmin
+const grantBonusToUser = asyncHandler(async (req, res) => {
+  const { userId, amount, reason } = req.body;
+  const adminId = req.user._id;
+
+  if (!userId || !amount || !reason) {
+    res.status(400);
+    throw new Error('Veuillez fournir un utilisateur, un montant et un motif.');
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    res.status(404);
+    throw new Error('Utilisateur non trouvé.');
+  }
+
+  user.keviumBalance += Number(amount);
+  await user.save();
+
+  // Log l'action de l'admin
+  await Log.create({
+    user: adminId,
+    action: 'bonus_granted',
+    description: `Bonus de ${amount} KVM accordé à ${user.name} (Raison: ${reason})`,
+    ip: req.ip,
+  });
+
+  // Envoyer une notification en temps réel à l'utilisateur ciblé
+  const socketId = req.io.getSocketIdByUserId(user._id.toString());
+  if (socketId) {
+    req.io.to(socketId).emit('bonus_granted', {
+      amount,
+      reason,
+      keviumBalance: user.keviumBalance,
+    });
+  }
+
+  res.status(200).json({
+    message: `Bonus de ${amount} KVM accordé à ${user.name} avec succès.`,
+    user,
+  });
+});
+
+
 // ... (getUsers, triggerRankUpdate, etc. ne changent pas)
 
 const updateUser = asyncHandler(async (req, res) => {
@@ -230,4 +277,5 @@ export {
   updateUserStatus,
   unlockUser,
   triggerRankUpdate,
+  grantBonusToUser, // Exporter la nouvelle fonction
 };

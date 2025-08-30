@@ -19,7 +19,8 @@ const logSchema = mongoose.Schema(
         'user_unbanned', // Gardé pour rétrocompatibilité potentielle
         'admin_promotion',
         'user_suspended',
-        'user_active'
+        'user_active',
+        'bonus_granted', // NOUVEAU : Ajout du type de log pour les bonus
       ],
     },
     description: {
