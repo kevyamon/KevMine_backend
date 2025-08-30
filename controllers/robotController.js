@@ -6,10 +6,11 @@ import sendEmail from '../utils/emailService.js';
 import { getPurchaseConfirmationTemplate } from '../utils/emailTemplates.js';
 import { updateQuestProgress } from '../utils/questService.js';
 
-// ... (les fonctions getRobots, getRobotById, purchaseRobot, sellRobot, upgradeRobot restent inchangées)
-
 const getRobots = asyncHandler(async (req, res) => {
-  const robots = await Robot.find({ owner: null }).populate('category');
+  // On populate maintenant aussi le vendeur pour avoir son nom
+  const robots = await Robot.find({ owner: null })
+    .populate('category')
+    .populate('seller', 'name');
   res.json(robots);
 });
 
@@ -38,6 +39,7 @@ const purchaseRobot = asyncHandler(async (req, res) => {
     robotToPurchase.isPlayerSale = false;
     robotToPurchase.stock = 0;
     robotToPurchase.investedKevium = price;
+    robotToPurchase.seller = undefined; // On nettoie le vendeur
     purchasedRobot = await robotToPurchase.save();
   } else {
     if (robotToPurchase.stock <= 0) { res.status(400); throw new Error('Ce robot est en rupture de stock.'); }
@@ -51,6 +53,7 @@ const purchaseRobot = asyncHandler(async (req, res) => {
       stock: 0,
       isPlayerSale: false,
       investedKevium: price,
+      seller: undefined, // On s'assure qu'il n'y a pas de vendeur
     });
     await purchasedRobot.save();
   }
@@ -95,6 +98,7 @@ const sellRobot = asyncHandler(async (req, res) => {
     });
 
     robotToSell.owner = null;
+    robotToSell.seller = user._id; // On enregistre qui est le vendeur
     robotToSell.isPlayerSale = true;
     robotToSell.price = salePrice;
     robotToSell.stock = 1;
@@ -106,7 +110,6 @@ const sellRobot = asyncHandler(async (req, res) => {
     
     await updateQuestProgress(req.user._id, 'SELL_ROBOT', 1);
     
-    // Émettre un événement pour rafraîchir le marché pour tous
     req.io.emit('robots_updated');
 
     res.status(200).json({
@@ -145,7 +148,6 @@ const createRobot = asyncHandler(async (req, res) => {
   const robot = new Robot({ name, icon, price, miningPower, rarity, stock, isSponsored, levelUpFactor, upgradeCost, category });
   const createdRobot = await robot.save();
   
-  // Émettre un événement pour rafraîchir le marché pour tous
   req.io.emit('robots_updated');
   
   res.status(201).json(createdRobot);
@@ -157,7 +159,6 @@ const updateRobot = asyncHandler(async (req, res) => {
     Object.assign(robot, req.body);
     const updatedRobot = await robot.save();
     
-    // CORRECTION : Émettre un événement pour rafraîchir le marché pour tous
     req.io.emit('robots_updated');
     
     res.json(updatedRobot);
@@ -169,7 +170,6 @@ const deleteRobot = asyncHandler(async (req, res) => {
   if (robot) {
     await Robot.deleteOne({ _id: robot._id });
     
-    // CORRECTION : Émettre un événement pour rafraîchir le marché pour tous
     req.io.emit('robots_updated');
     
     res.json({ message: 'Robot supprimé' });

@@ -47,6 +47,12 @@ const robotSchema = mongoose.Schema(
       ref: 'User',
       required: false,
     },
+    // NOUVEAU : Ajout du champ pour identifier le vendeur
+    seller: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: false,
+    },
     level: {
       type: Number,
       default: 1,
