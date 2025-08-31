@@ -20,6 +20,22 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // NOUVEAU: Pour savoir si un message a été modifié
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    // NOUVEAU: Pour une suppression "logique" sans effacer la donnée
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    // NOUVEAU: Pour lier un message à celui auquel il répond
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
   },
   {
     timestamps: true,

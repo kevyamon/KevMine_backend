@@ -12,6 +12,13 @@ const conversationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Message',
     },
+    // NOUVEAU: Un tableau pour stocker les IDs des utilisateurs qui ont archivé cette conversation
+    archivedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     timestamps: true,
