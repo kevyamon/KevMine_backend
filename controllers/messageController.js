@@ -59,17 +59,18 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   await newMessage.save();
 
-  // Mettre à jour le dernier message de la conversation
   conversation.lastMessage = newMessage._id;
   await conversation.save();
 
-  // Logique Socket.io pour l'envoi en temps réel
+  // CORRECTION BUG TOAST: On peuple le message avec les infos de l'expéditeur AVANT de l'envoyer via socket
+  const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name photo');
+
   const receiverSocketId = req.io.getSocketIdByUserId(receiverId);
   if (receiverSocketId) {
-    req.io.to(receiverSocketId).emit('newMessage', newMessage);
+    req.io.to(receiverSocketId).emit('newMessage', populatedMessage);
   }
 
-  res.status(201).json(newMessage);
+  res.status(201).json(populatedMessage);
 });
 
 // @desc    Get messages for a conversation
@@ -101,7 +102,34 @@ const getConversations = asyncHandler(async (req, res) => {
     })
     .sort({ updatedAt: -1 });
 
-  res.status(200).json(conversations);
+  // AJOUT: Calculer le nombre de messages non lus pour chaque conversation
+  const conversationsWithUnread = await Promise.all(
+    conversations.map(async (convo) => {
+      const unreadCount = await Message.countDocuments({
+        conversationId: convo._id,
+        isRead: false,
+        sender: { $ne: userId }, // On ne compte que les messages reçus
+      });
+      return { ...convo.toObject(), unreadCount };
+    })
+  );
+
+  res.status(200).json(conversationsWithUnread);
 });
 
-export { sendMessage, getMessages, getConversations, findOrCreateConversation };
+// NOUVEAU: @desc    Mark a conversation's messages as read
+// @route   PUT /api/messages/conversations/:conversationId/read
+// @access  Private
+const markConversationAsRead = asyncHandler(async (req, res) => {
+  const { conversationId } = req.params;
+  const userId = req.user._id;
+
+  await Message.updateMany(
+    { conversationId: conversationId, sender: { $ne: userId }, isRead: false },
+    { $set: { isRead: true } }
+  );
+
+  res.status(200).json({ message: 'Messages marqués comme lus.' });
+});
+
+export { sendMessage, getMessages, getConversations, findOrCreateConversation, markConversationAsRead };
