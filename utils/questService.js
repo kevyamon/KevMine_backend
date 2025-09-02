@@ -11,12 +11,10 @@ const assignDailyQuests = async (userId) => {
 
   const existingQuests = await UserQuest.findOne({ user: userId, date: today });
 
-  // Si l'utilisateur a déjà des quêtes pour aujourd'hui, on ne fait rien.
   if (existingQuests) {
     return;
   }
 
-  // Sélectionner 3 quêtes actives au hasard
   const activeQuests = await Quest.find({ isActive: true });
   const randomQuests = activeQuests.sort(() => 0.5 - Math.random()).slice(0, 3);
 
@@ -33,11 +31,12 @@ const assignDailyQuests = async (userId) => {
 
 /**
  * Met à jour la progression d'une quête pour un utilisateur.
+ * @param {object} io - L'instance Socket.io.
  * @param {string} userId - L'ID de l'utilisateur.
  * @param {string} questType - Le type de quête (ex: 'PURCHASE_ROBOT').
  * @param {number} value - La valeur à ajouter à la progression (ex: 1 pour un achat).
  */
-const updateQuestProgress = async (userId, questType, value = 1) => {
+const updateQuestProgress = async (io, userId, questType, value = 1) => {
   try {
     const today = new Date().setHours(0, 0, 0, 0);
     const userQuests = await UserQuest.find({
@@ -46,16 +45,26 @@ const updateQuestProgress = async (userId, questType, value = 1) => {
       isCompleted: false,
     }).populate('quest');
 
+    let progressUpdated = false;
+
     for (const userQuest of userQuests) {
       if (userQuest.quest.questType === questType) {
         userQuest.progress += value;
+        progressUpdated = true;
 
         if (userQuest.progress >= userQuest.quest.target) {
-          userQuest.progress = userQuest.quest.target; // Plafonner la progression
+          userQuest.progress = userQuest.quest.target;
           userQuest.isCompleted = true;
-          // Ici, on pourrait envoyer une notification via Socket.io
         }
         await userQuest.save();
+      }
+    }
+
+    // Si une progression a eu lieu, on notifie le client en temps réel
+    if (progressUpdated && io) {
+      const socketId = io.getSocketIdByUserId(userId.toString());
+      if (socketId) {
+        io.to(socketId).emit('quest_updated');
       }
     }
   } catch (error) {
