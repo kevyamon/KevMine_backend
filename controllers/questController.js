@@ -5,17 +5,13 @@ import User from '../models/userModel.js';
 import { assignDailyQuests } from '../utils/questService.js';
 import { createNotification } from '../utils/notificationService.js';
 
-// @desc    Get all quests for admin panel
-// @route   GET /api/quests/admin/all
-// @access  Private/Admin
+// ... (les autres fonctions restent inchangées) ...
+
 const getAllQuests = asyncHandler(async (req, res) => {
   const quests = await Quest.find({});
   res.json(quests);
 });
 
-// @desc    Get quests for a user
-// @route   GET /api/quests
-// @access  Private
 const getQuestsForUser = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const today = new Date().setHours(0, 0, 0, 0);
@@ -109,8 +105,13 @@ const deleteQuest = asyncHandler(async (req, res) => {
     const quest = await Quest.findById(req.params.id);
 
     if (quest) {
+        // NOUVEAU : On supprime d'abord toutes les progressions liées à cette quête
+        await UserQuest.deleteMany({ quest: quest._id });
+        
+        // Ensuite, on supprime la quête elle-même
         await Quest.deleteOne({ _id: quest._id });
-        res.json({ message: 'Quête supprimée' });
+        
+        res.json({ message: 'Quête et progressions associées supprimées' });
     } else {
         res.status(404);
         throw new Error('Quête non trouvée');
@@ -123,5 +124,5 @@ export {
   createQuest,
   updateQuest,
   deleteQuest,
-  getAllQuests, // On exporte la nouvelle fonction
+  getAllQuests,
 };
