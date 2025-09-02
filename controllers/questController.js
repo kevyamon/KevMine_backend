@@ -3,9 +3,32 @@ import UserQuest from '../models/userQuestModel.js';
 import Quest from '../models/questModel.js';
 import User from '../models/userModel.js';
 import { assignDailyQuests } from '../utils/questService.js';
-import { createNotification } from '../utils/notificationService.js'; // 1. Importer le service
+import { createNotification } from '../utils/notificationService.js';
 
-// ... (getQuestsForUser reste inchangé)
+// @desc    Get all quests for admin panel
+// @route   GET /api/quests/admin/all
+// @access  Private/Admin
+const getAllQuests = asyncHandler(async (req, res) => {
+  const quests = await Quest.find({});
+  res.json(quests);
+});
+
+// @desc    Get quests for a user
+// @route   GET /api/quests
+// @access  Private
+const getQuestsForUser = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const today = new Date().setHours(0, 0, 0, 0);
+
+  await assignDailyQuests(userId);
+
+  const userQuests = await UserQuest.find({ user: userId, date: today }).populate(
+    'quest'
+  );
+
+  res.json(userQuests);
+});
+
 
 const claimQuestReward = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -33,7 +56,6 @@ const claimQuestReward = asyncHandler(async (req, res) => {
   user.keviumBalance += userQuest.quest.reward;
   await user.save();
   
-  // 2. Créer une notification pour la récompense de quête
   await createNotification(
     req.io,
     userId,
@@ -45,20 +67,6 @@ const claimQuestReward = asyncHandler(async (req, res) => {
     message: `Récompense de ${userQuest.quest.reward} KVM réclamée !`,
     keviumBalance: user.keviumBalance,
   });
-});
-
-// ... (Le reste du fichier reste identique)
-const getQuestsForUser = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const today = new Date().setHours(0, 0, 0, 0);
-
-  await assignDailyQuests(userId);
-
-  const userQuests = await UserQuest.find({ user: userId, date: today }).populate(
-    'quest'
-  );
-
-  res.json(userQuests);
 });
 
 const createQuest = asyncHandler(async (req, res) => {
@@ -115,4 +123,5 @@ export {
   createQuest,
   updateQuest,
   deleteQuest,
+  getAllQuests, // On exporte la nouvelle fonction
 };

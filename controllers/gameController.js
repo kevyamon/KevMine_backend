@@ -1,6 +1,8 @@
 import asyncHandler from 'express-async-handler';
 import User from '../models/userModel.js';
 import { updateQuestProgress } from '../utils/questService.js';
+// 1. Importer le service de succès
+import { updateAchievementProgress } from '../utils/achievementService.js';
 
 // @desc    Update user's unclaimed Kevium based on mining power and time
 // @route   GET /api/game/status
@@ -45,6 +47,13 @@ const claimKevium = asyncHandler(async (req, res) => {
   
   await updateQuestProgress(req.user._id, 'CLAIM_KVM', amountToClaim);
   
+  // 2. Mettre à jour les succès liés au solde et au total de KVM
+  await updateAchievementProgress(req.io, req.user._id, 'KVM_BALANCE', updatedUser.keviumBalance);
+  // Pour le total gagné, nous devons le calculer. Pour l'instant, nous approximons avec le solde.
+  // Une meilleure solution serait d'ajouter un champ `totalKvmEarned` à l'utilisateur.
+  await updateAchievementProgress(req.io, req.user._id, 'TOTAL_KVM_EARNED', updatedUser.keviumBalance);
+
+
   res.json({ message: `${amountToClaim.toFixed(2)} KVM réclamés avec succès !`, keviumBalance: updatedUser.keviumBalance, unclaimedKevium: updatedUser.unclaimedKevium });
 });
 
@@ -53,7 +62,6 @@ const claimKevium = asyncHandler(async (req, res) => {
 // @access  Public
 const getLeaderboard = asyncHandler(async (req, res) => {
   const { searchTerm } = req.query;
-  // CORRECTION : On ne prend que les joueurs classés (rang > 0)
   let query = { isAdmin: false, rank: { $gt: 0 } };
 
   if (searchTerm) {

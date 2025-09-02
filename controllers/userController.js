@@ -6,6 +6,8 @@ import sendEmail from '../utils/emailService.js';
 import crypto from 'crypto';
 import RefreshToken from '../models/refreshTokenModel.js';
 import jwt from 'jsonwebtoken';
+// 1. Importer le service d'initialisation des succès
+import { initializeAchievementsForUser } from '../utils/achievementService.js';
 
 const authUser = asyncHandler(async (req, res) => {
   const { identifier, password } = req.body;
@@ -32,22 +34,17 @@ const authUser = asyncHandler(async (req, res) => {
     throw new Error('Trop de tentatives de connexion échouées. Veuillez réessayer dans 10 minutes.');
   }
   
-  // --- DÉBUT DE LA CORRECTION ---
-  // Si l'utilisateur est banni ou suspendu, on renvoie une erreur 403
-  // MAIS on inclut ses informations pour que le frontend puisse le rediriger.
   if (user.status === 'banned' || user.status === 'suspended') {
     const message = `Votre compte est ${user.status === 'banned' ? 'banni' : 'temporairement suspendu'}.`;
     
-    // On ne génère pas de token, mais on fournit les infos utilisateur
     const userData = user.toObject();
     delete userData.password;
 
     return res.status(403).json({
       message,
-      userInfo: userData // Fournit les détails de l'utilisateur banni
+      userInfo: userData
     });
   }
-  // --- FIN DE LA CORRECTION ---
 
   await Log.create({
     user: user._id,
@@ -72,8 +69,6 @@ const authUser = asyncHandler(async (req, res) => {
     timestamp: new Date(),
   });
 });
-
-// ... (Le reste du fichier reste inchangé)
 
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password, phone } = req.body;
@@ -110,6 +105,9 @@ const registerUser = asyncHandler(async (req, res) => {
   const user = await User.create(userDataToCreate);
 
   if (user) {
+    // 2. Initialiser les succès pour le nouvel utilisateur
+    await initializeAchievementsForUser(user._id);
+
     const isNewUser = true;
     await generateTokens(res, user._id);
     const userData = user.toObject();
@@ -120,6 +118,8 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error('Données utilisateur invalides');
   }
 });
+
+// ... (Le reste du fichier reste inchangé)
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const refreshToken = req.cookies.refresh;

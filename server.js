@@ -9,6 +9,7 @@ import logRoutes from './routes/logRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import questRoutes from './routes/questRoutes.js';
+import achievementRoutes from './routes/achievementRoutes.js'; // 1. Importer les nouvelles routes
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
@@ -73,6 +74,7 @@ app.use('/api/logs', logRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/quests', questRoutes);
+app.use('/api/achievements', achievementRoutes); // 2. Utiliser les nouvelles routes
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);

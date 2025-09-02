@@ -5,9 +5,10 @@ import GameSetting from '../models/gameSettingModel.js';
 import sendEmail from '../utils/emailService.js';
 import { getPurchaseConfirmationTemplate } from '../utils/emailTemplates.js';
 import { updateQuestProgress } from '../utils/questService.js';
+// 1. Importer le nouveau service de succès
+import { updateAchievementProgress } from '../utils/achievementService.js';
 
 const getRobots = asyncHandler(async (req, res) => {
-  // On populate maintenant aussi le vendeur pour avoir son nom
   const robots = await Robot.find({ owner: null })
     .populate('category')
     .populate('seller', 'name');
@@ -39,7 +40,7 @@ const purchaseRobot = asyncHandler(async (req, res) => {
     robotToPurchase.isPlayerSale = false;
     robotToPurchase.stock = 0;
     robotToPurchase.investedKevium = price;
-    robotToPurchase.seller = undefined; // On nettoie le vendeur
+    robotToPurchase.seller = undefined;
     purchasedRobot = await robotToPurchase.save();
   } else {
     if (robotToPurchase.stock <= 0) { res.status(400); throw new Error('Ce robot est en rupture de stock.'); }
@@ -53,7 +54,7 @@ const purchaseRobot = asyncHandler(async (req, res) => {
       stock: 0,
       isPlayerSale: false,
       investedKevium: price,
-      seller: undefined, // On s'assure qu'il n'y a pas de vendeur
+      seller: undefined,
     });
     await purchasedRobot.save();
   }
@@ -63,6 +64,11 @@ const purchaseRobot = asyncHandler(async (req, res) => {
   const updatedUser = await user.save();
   
   await updateQuestProgress(req.user._id, 'PURCHASE_ROBOT', 1);
+
+  // 2. Mettre à jour les succès liés à l'achat et au nombre de robots possédés
+  await updateAchievementProgress(req.io, req.user._id, 'ROBOTS_PURCHASED', updatedUser.purchaseHistory.length);
+  await updateAchievementProgress(req.io, req.user._id, 'ROBOTS_OWNED', updatedUser.inventory.length);
+
 
   const emailContent = getPurchaseConfirmationTemplate(user.name, purchasedRobot.name, purchasedRobot.icon, price, updatedUser.keviumBalance);
   await sendEmail({ email: user.email, subject: `Confirmation d'achat - ${purchasedRobot.name}`, htmlContent: emailContent });
@@ -98,23 +104,27 @@ const sellRobot = asyncHandler(async (req, res) => {
     });
 
     robotToSell.owner = null;
-    robotToSell.seller = user._id; // On enregistre qui est le vendeur
+    robotToSell.seller = user._id;
     robotToSell.isPlayerSale = true;
     robotToSell.price = salePrice;
     robotToSell.stock = 1;
     robotToSell.investedKevium = 0;
 
     await robotToSell.save();
-    await user.save();
+    const updatedUser = await user.save();
     await superAdmin.save();
     
     await updateQuestProgress(req.user._id, 'SELL_ROBOT', 1);
+
+    // 3. Mettre à jour les succès liés à la vente et au nombre de robots
+    await updateAchievementProgress(req.io, req.user._id, 'ROBOTS_SOLD', updatedUser.salesHistory.length);
+    await updateAchievementProgress(req.io, req.user._id, 'ROBOTS_OWNED', updatedUser.inventory.length);
     
     req.io.emit('robots_updated');
 
     res.status(200).json({
       message: `Robot ${robotToSell.name} vendu pour ${salePrice} KVM. Vous recevez ${userTotalReturn} KVM.`,
-      user: user,
+      user: updatedUser,
     });
 });
 
@@ -137,6 +147,14 @@ const upgradeRobot = asyncHandler(async (req, res) => {
   const updatedUser = await user.save();
   
   await updateQuestProgress(req.user._id, 'UPGRADE_ROBOT', 1);
+
+  // 4. Mettre à jour le succès lié aux améliorations
+  const allUpgrades = await Robot.aggregate([
+      { $match: { owner: user._id } },
+      { $group: { _id: null, totalUpgrades: { $sum: { $subtract: ['$level', 1] } } } }
+  ]);
+  const totalUpgrades = allUpgrades.length > 0 ? allUpgrades[0].totalUpgrades : 0;
+  await updateAchievementProgress(req.io, req.user._id, 'ROBOTS_UPGRADED', totalUpgrades);
 
   res.status(200).json({ message: `${robotToUpgrade.name} amélioré au niveau ${robotToUpgrade.level} !`, robot: robotToUpgrade, user: updatedUser });
 });
