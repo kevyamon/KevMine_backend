@@ -12,7 +12,7 @@ import questRoutes from './routes/questRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
-import messageRoutes from './routes/messageRoutes.js'; // 1. Importer les routes de messagerie
+import messageRoutes from './routes/messageRoutes.js'; 
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import cors from 'cors';
 import http from 'http';
@@ -20,6 +20,7 @@ import { Server } from 'socket.io';
 import socketHandler from './socket/socketHandler.js';
 import startRankUpdateScheduler from './utils/scheduler.js';
 import path from 'path';
+import warningRoutes from './routes/warningRoutes.js';
 
 dotenv.config();
 
@@ -75,7 +76,8 @@ app.use('/api/quests', questRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/messages', messageRoutes); // 2. Utiliser les routes de messagerie
+app.use('/api/messages', messageRoutes);
+app.use('/api/warnings', warningRoutes);
 
 app.get('/ping', (req, res) => {
   res.status(200).send('Pong');
