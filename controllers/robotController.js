@@ -5,7 +5,6 @@ import GameSetting from '../models/gameSettingModel.js';
 import sendEmail from '../utils/emailService.js';
 import { getPurchaseConfirmationTemplate } from '../utils/emailTemplates.js';
 import { updateQuestProgress } from '../utils/questService.js';
-// 1. Importer le nouveau service de succès
 import { updateAchievementProgress } from '../utils/achievementService.js';
 
 const getRobots = asyncHandler(async (req, res) => {
@@ -63,9 +62,8 @@ const purchaseRobot = asyncHandler(async (req, res) => {
   user.purchaseHistory.push({ robotName: purchasedRobot.name, price: price, purchaseDate: new Date() });
   const updatedUser = await user.save();
   
-  await updateQuestProgress(req.user._id, 'PURCHASE_ROBOT', 1);
+  await updateQuestProgress(req.io, req.user._id, 'PURCHASE_ROBOT', 1); // Correction: ajout de req.io
 
-  // 2. Mettre à jour les succès liés à l'achat et au nombre de robots possédés
   await updateAchievementProgress(req.io, req.user._id, 'ROBOTS_PURCHASED', updatedUser.purchaseHistory.length);
   await updateAchievementProgress(req.io, req.user._id, 'ROBOTS_OWNED', updatedUser.inventory.length);
 
@@ -114,9 +112,8 @@ const sellRobot = asyncHandler(async (req, res) => {
     const updatedUser = await user.save();
     await superAdmin.save();
     
-    await updateQuestProgress(req.user._id, 'SELL_ROBOT', 1);
+    await updateQuestProgress(req.io, req.user._id, 'SELL_ROBOT', 1); // Correction: ajout de req.io
 
-    // 3. Mettre à jour les succès liés à la vente et au nombre de robots
     await updateAchievementProgress(req.io, req.user._id, 'ROBOTS_SOLD', updatedUser.salesHistory.length);
     await updateAchievementProgress(req.io, req.user._id, 'ROBOTS_OWNED', updatedUser.inventory.length);
     
@@ -146,9 +143,8 @@ const upgradeRobot = asyncHandler(async (req, res) => {
   await robotToUpgrade.save();
   const updatedUser = await user.save();
   
-  await updateQuestProgress(req.user._id, 'UPGRADE_ROBOT', 1);
+  await updateQuestProgress(req.io, req.user._id, 'UPGRADE_ROBOT', 1); // Correction: ajout de req.io
 
-  // 4. Mettre à jour le succès lié aux améliorations
   const allUpgrades = await Robot.aggregate([
       { $match: { owner: user._id } },
       { $group: { _id: null, totalUpgrades: { $sum: { $subtract: ['$level', 1] } } } }
