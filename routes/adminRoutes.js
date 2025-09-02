@@ -13,7 +13,8 @@ import {
   updateUserStatus,
   unlockUser,
   triggerRankUpdate,
-  grantBonusToUser, // 1. Importer la nouvelle fonction
+  grantBonusToUser,
+  sendWarning, // 1. Importer la nouvelle fonction
 } from '../controllers/adminController.js';
 import {
   getSettings,
@@ -22,7 +23,7 @@ import {
 
 const router = express.Router();
 
-// --- CORRECTION : Routes réorganisées pour une meilleure lisibilité et sécurité ---
+// --- Routes réorganisées pour une meilleure lisibilité et sécurité ---
 
 // Route accessible à tout utilisateur connecté
 router.route('/settings').get(protect, getSettings);
@@ -31,13 +32,13 @@ router.route('/settings').get(protect, getSettings);
 router.route('/settings').put(protect, superAdminProtect, updateSettings);
 router.route('/trigger-rank-update').post(protect, superAdminProtect, triggerRankUpdate);
 router.route('/users/:id/status').put(protect, superAdminProtect, updateUserStatus);
-router.route('/users/grant-bonus').post(protect, superAdminProtect, grantBonusToUser); // 2. Ajouter la nouvelle route
+router.route('/users/grant-bonus').post(protect, superAdminProtect, grantBonusToUser);
 
 // Routes nécessitant les droits d'Administrateur
-// On applique ici la double protection : d'abord identifier (protect), puis autoriser (adminProtect)
 router.route('/users').get(protect, adminProtect, getUsers);
 router.route('/users/locked').get(protect, adminProtect, getLockedUsers);
 router.route('/users/:id/unlock').put(protect, adminProtect, unlockUser);
+router.route('/users/:id/warn').post(protect, adminProtect, sendWarning); // 2. Ajouter la nouvelle route pour les avertissements
 router
   .route('/users/:id')
   .get(protect, adminProtect, getUserById)

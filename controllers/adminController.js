@@ -1,11 +1,58 @@
 import asyncHandler from 'express-async-handler';
 import User from '../models/userModel.js';
 import Log from '../models/logModel.js';
+import Warning from '../models/warningModel.js'; // 1. Importer le nouveau modèle
 import generateTokens from '../utils/generateToken.js';
 import sendEmail from '../utils/emailService.js';
 import { getStatusChangeTemplate } from '../utils/emailTemplates.js';
 import { updatePlayerRanks } from '../utils/scheduler.js';
 import { createNotification } from '../utils/notificationService.js';
+
+// --- NOUVELLE FONCTION POUR ENVOYER UN AVERTISSEMENT ---
+// @desc    Send a formal warning to a user
+// @route   POST /api/admin/users/:id/warn
+// @access  Private/Admin
+const sendWarning = asyncHandler(async (req, res) => {
+  const { message, suggestedActions } = req.body;
+  const adminId = req.user._id;
+  const userId = req.params.id;
+
+  if (!message) {
+    res.status(400);
+    throw new Error('Le message d\'avertissement ne peut pas être vide.');
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    res.status(404);
+    throw new Error('Utilisateur non trouvé.');
+  }
+
+  const warning = await Warning.create({
+    user: userId,
+    admin: adminId,
+    message,
+    suggestedActions: suggestedActions || [],
+  });
+  
+  // Envoyer l'avertissement en temps réel à l'utilisateur ciblé
+  const socketId = req.io.getSocketIdByUserId(userId.toString());
+  if (socketId) {
+    req.io.to(socketId).emit('new_warning', warning);
+  }
+
+  // Créer une notification standard en plus de l'avertissement
+  await createNotification(
+    req.io,
+    userId,
+    `Vous avez reçu un avertissement de l'administration.`,
+    'warning'
+  );
+
+  res.status(201).json(warning);
+});
+
+// ... (le reste du fichier reste inchangé)
 
 // --- MISE À JOUR MAJEURE DE LA FONCTION DE BONUS ---
 // @desc    Grant bonus KVM to one, many, or all users
@@ -83,8 +130,6 @@ const grantBonusToUser = asyncHandler(async (req, res) => {
 
   res.status(200).json({ message: logDescription });
 });
-
-// ... (le reste du fichier reste inchangé)
 
 const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
@@ -304,4 +349,5 @@ export {
   unlockUser,
   triggerRankUpdate,
   grantBonusToUser,
+  sendWarning, // 2. Exporter la nouvelle fonction
 };
