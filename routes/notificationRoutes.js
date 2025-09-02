@@ -1,17 +1,21 @@
 import express from 'express';
 import {
   getNotifications,
-  getArchivedNotifications, // 1. Importer la nouvelle fonction
+  getArchivedNotifications,
   markAllAsRead,
-  toggleArchiveNotification, // 2. Importer la nouvelle fonction
+  toggleArchiveNotification,
+  markOneAsRead, // 1. Importer la nouvelle fonction
 } from '../controllers/notificationController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.route('/').get(protect, getNotifications);
-router.route('/archived').get(protect, getArchivedNotifications); // 3. Ajouter la route pour les archives
+router.route('/archived').get(protect, getArchivedNotifications);
 router.route('/mark-read').put(protect, markAllAsRead);
-router.route('/:id/archive').put(protect, toggleArchiveNotification); // 4. Ajouter la route pour archiver/désarchiver
+
+// 2. Ajouter les routes spécifiques à une notification par son ID
+router.route('/:id/archive').put(protect, toggleArchiveNotification);
+router.route('/:id/mark-read').put(protect, markOneAsRead); // Nouvelle route
 
 export default router;

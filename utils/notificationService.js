@@ -6,7 +6,7 @@ import Notification from '../models/notificationModel.js';
  * @param {string} userId - L'ID de l'utilisateur qui recevra la notification.
  * @param {string} message - Le message de la notification.
  * @param {string} type - Le type de notification (bonus, quest, etc.).
- * @param {string} [link] - Un lien optionnel pour la redirection.
+ * @param {string} [link] - Un lien optionnel pour la redirection ou lier à un autre document.
  */
 export const createNotification = async (io, userId, message, type, link) => {
   try {
@@ -14,7 +14,7 @@ export const createNotification = async (io, userId, message, type, link) => {
       user: userId,
       message,
       type,
-      link,
+      link, // Le lien est maintenant utilisé
     });
 
     const socketId = io.getSocketIdByUserId(userId.toString());

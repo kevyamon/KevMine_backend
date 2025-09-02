@@ -27,27 +27,26 @@ const sendWarning = asyncHandler(async (req, res) => {
     throw new Error('Utilisateur non trouvé.');
   }
   
-  // CORRECTION : Utilise les nouveaux champs du modèle 'Warning'
   const warning = await Warning.create({
     user: userId,
-    sender: adminId, // Le champ est maintenant 'sender'
+    sender: adminId,
     message,
     suggestedActions: suggestedActions || [],
-    status: 'active', // Le statut est défini explicitement
+    status: 'active',
   });
   
-  // Envoyer l'avertissement en temps réel à l'utilisateur ciblé
   const socketId = req.io.getSocketIdByUserId(userId.toString());
   if (socketId) {
     req.io.to(socketId).emit('new_warning', warning);
   }
 
-  // Créer une notification standard en plus de l'avertissement
+  // Créer une notification en liant l'ID de l'avertissement
   await createNotification(
     req.io,
     userId,
     `Vous avez reçu un avertissement de l'administration.`,
-    'warning'
+    'warning',
+    warning._id // On passe l'ID de l'avertissement ici
   );
 
   res.status(201).json(warning);
@@ -75,10 +74,8 @@ const grantBonusToUser = asyncHandler(async (req, res) => {
 
   let targetUsers = [];
   if (grantToAll) {
-    // Sélectionner tous les joueurs (non-admins)
     targetUsers = await User.find({ isAdmin: false }, '_id name');
   } else if (userIds && userIds.length > 0) {
-    // Sélectionner les joueurs spécifiés
     targetUsers = await User.find({ _id: { $in: userIds } }, '_id name');
   } else {
     res.status(400);
@@ -92,19 +89,15 @@ const grantBonusToUser = asyncHandler(async (req, res) => {
 
   const userIdsToUpdate = targetUsers.map(u => u._id);
 
-  // Mettre à jour le solde de tous les utilisateurs ciblés en une seule requête
   await User.updateMany(
     { _id: { $in: userIdsToUpdate } },
     { $inc: { keviumBalance: numericAmount } }
   );
 
-  // Créer les notifications et envoyer les événements sockets
   const notificationMessage = `Vous avez reçu un bonus de ${numericAmount} KVM ! Motif : ${reason}`;
   for (const user of targetUsers) {
-    // 1. Créer la notification dans la base de données (et émettre l'événement pour la cloche)
     await createNotification(req.io, user._id, notificationMessage, 'bonus');
     
-    // 2. Émettre l'événement pour afficher la modale pop-up
     const updatedUser = await User.findById(user._id, 'keviumBalance');
     const socketId = req.io.getSocketIdByUserId(user._id.toString());
     if (socketId) {
@@ -116,7 +109,6 @@ const grantBonusToUser = asyncHandler(async (req, res) => {
     }
   }
 
-  // Journaliser l'action de l'admin
   const logDescription = grantToAll
     ? `Bonus de ${numericAmount} KVM accordé à TOUS les joueurs. Raison: ${reason}`
     : `Bonus de ${numericAmount} KVM accordé à ${targetUsers.length} joueur(s). Raison: ${reason}`;
