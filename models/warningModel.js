@@ -7,7 +7,8 @@ const warningSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
-    admin: {
+    // CORRECTION : Renommé 'admin' en 'sender' pour plus de clarté.
+    sender: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
@@ -16,14 +17,18 @@ const warningSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    // Le nom 'suggestedActions' est conservé car il correspond bien
+    // à ce que l'admin "suggère" à l'utilisateur.
     suggestedActions: [
       {
         type: String,
       },
     ],
-    isActive: {
-      type: Boolean,
-      default: true,
+    // CORRECTION : Remplacé 'isActive' par un statut pour plus de flexibilité.
+    status: {
+      type: String,
+      enum: ['active', 'dismissed'],
+      default: 'active',
     },
   },
   {
@@ -32,7 +37,7 @@ const warningSchema = new mongoose.Schema(
 );
 
 // Index pour retrouver rapidement les avertissements actifs d'un utilisateur
-warningSchema.index({ user: 1, isActive: 1 });
+warningSchema.index({ user: 1, status: 1 });
 
 const Warning = mongoose.model('Warning', warningSchema);
 

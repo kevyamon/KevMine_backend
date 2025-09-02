@@ -1,14 +1,13 @@
 import asyncHandler from 'express-async-handler';
 import User from '../models/userModel.js';
 import Log from '../models/logModel.js';
-import Warning from '../models/warningModel.js'; // 1. Importer le nouveau modèle
+import Warning from '../models/warningModel.js';
 import generateTokens from '../utils/generateToken.js';
 import sendEmail from '../utils/emailService.js';
 import { getStatusChangeTemplate } from '../utils/emailTemplates.js';
 import { updatePlayerRanks } from '../utils/scheduler.js';
 import { createNotification } from '../utils/notificationService.js';
 
-// --- NOUVELLE FONCTION POUR ENVOYER UN AVERTISSEMENT ---
 // @desc    Send a formal warning to a user
 // @route   POST /api/admin/users/:id/warn
 // @access  Private/Admin
@@ -19,7 +18,7 @@ const sendWarning = asyncHandler(async (req, res) => {
 
   if (!message) {
     res.status(400);
-    throw new Error('Le message d\'avertissement ne peut pas être vide.');
+    throw new Error("Le message d'avertissement ne peut pas être vide.");
   }
 
   const user = await User.findById(userId);
@@ -27,12 +26,14 @@ const sendWarning = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Utilisateur non trouvé.');
   }
-
+  
+  // CORRECTION : Utilise les nouveaux champs du modèle 'Warning'
   const warning = await Warning.create({
     user: userId,
-    admin: adminId,
+    sender: adminId, // Le champ est maintenant 'sender'
     message,
     suggestedActions: suggestedActions || [],
+    status: 'active', // Le statut est défini explicitement
   });
   
   // Envoyer l'avertissement en temps réel à l'utilisateur ciblé
@@ -54,7 +55,6 @@ const sendWarning = asyncHandler(async (req, res) => {
 
 // ... (le reste du fichier reste inchangé)
 
-// --- MISE À JOUR MAJEURE DE LA FONCTION DE BONUS ---
 // @desc    Grant bonus KVM to one, many, or all users
 // @route   POST /api/admin/users/grant-bonus
 // @access  Private/SuperAdmin
@@ -349,5 +349,5 @@ export {
   unlockUser,
   triggerRankUpdate,
   grantBonusToUser,
-  sendWarning, // 2. Exporter la nouvelle fonction
+  sendWarning,
 };
