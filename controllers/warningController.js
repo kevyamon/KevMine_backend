@@ -5,9 +5,10 @@ import Warning from '../models/warningModel.js';
 // @route   GET /api/warnings
 // @access  Private
 const getActiveWarnings = asyncHandler(async (req, res) => {
+  // CORRECTION : La recherche se base maintenant sur le statut 'active'.
   const warnings = await Warning.find({
     user: req.user._id,
-    isActive: true,
+    status: 'active',
   }).sort({ createdAt: -1 });
 
   res.status(200).json(warnings);
@@ -25,7 +26,8 @@ const dismissWarning = asyncHandler(async (req, res) => {
     throw new Error('Avertissement non trouvé.');
   }
 
-  warning.isActive = false;
+  // CORRECTION : On met à jour le statut au lieu de supprimer ou utiliser un booléen.
+  warning.status = 'dismissed';
   await warning.save();
 
   res.status(200).json({ message: 'Avertissement acquitté.' });
